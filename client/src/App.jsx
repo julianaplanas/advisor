@@ -3,29 +3,29 @@ import { api } from "./api.js";
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 const DEFAULT_PORTFOLIO = [
-  { id:"nvda",   platform:"eToro",      name:"NVDA",               value:2800, type:"stock",  region:"US",     ticker:"NVDA",    annualFee:0,    invested:2800 },
-  { id:"sxr8",   platform:"eToro",      name:"SXR8 (S&P 500 ETF)", value:2400, type:"etf",    region:"US",     ticker:"SXR8.DE", annualFee:0.07, invested:2400 },
-  { id:"qdve",   platform:"eToro",      name:"QDVE (Tech ETF)",    value:1800, type:"etf",    region:"US",     ticker:"QDVE.MI", annualFee:0.35, invested:1800 },
-  { id:"net",    platform:"eToro",      name:"NET",                value:900,  type:"stock",  region:"US",     ticker:"NET",     annualFee:0,    invested:900  },
-  { id:"aapl",   platform:"eToro",      name:"AAPL",               value:850,  type:"stock",  region:"US",     ticker:"AAPL",    annualFee:0,    invested:850  },
-  { id:"msft",   platform:"eToro",      name:"MSFT",               value:820,  type:"stock",  region:"US",     ticker:"MSFT",    annualFee:0,    invested:820  },
-  { id:"meli",   platform:"eToro",      name:"MELI",               value:750,  type:"stock",  region:"EM",     ticker:"MELI",    annualFee:0,    invested:750  },
-  { id:"ddog",   platform:"eToro",      name:"DDOG",               value:600,  type:"stock",  region:"US",     ticker:"DDOG",    annualFee:0,    invested:600  },
-  { id:"vrtx",   platform:"eToro",      name:"VRTX",               value:550,  type:"stock",  region:"US",     ticker:"VRTX",    annualFee:0,    invested:550  },
-  { id:"abbv",   platform:"eToro",      name:"ABBV",               value:500,  type:"stock",  region:"US",     ticker:"ABBV",    annualFee:0,    invested:500  },
-  { id:"vgwd",   platform:"eToro",      name:"VGWD (Dividend ETF)",value:480,  type:"etf",    region:"EU",     ticker:"VHYD.AS", annualFee:0.29, invested:480  },
-  { id:"idem",   platform:"eToro",      name:"IDEM (Italy ETF)",   value:320,  type:"etf",    region:"EU",     ticker:"IDEM.MI", annualFee:0.35, invested:320  },
-  { id:"bayn",   platform:"eToro",      name:"BAYN",               value:290,  type:"stock",  region:"EU",     ticker:"BAYN.DE", annualFee:0,    invested:290  },
-  { id:"ypf",    platform:"eToro",      name:"YPF",                value:280,  type:"stock",  region:"EM",     ticker:"YPF",     annualFee:0,    invested:280  },
-  { id:"vrns",   platform:"eToro",      name:"VRNS",               value:210,  type:"stock",  region:"US",     ticker:"VRNS",    annualFee:0,    invested:210  },
-  { id:"other",  platform:"eToro",      name:"Other",              value:390,  type:"stock",  region:"US",     ticker:null,      annualFee:0,    invested:390  },
-  { id:"eth",    platform:"Binance",    name:"ETH",                value:2149, type:"crypto", region:"Crypto", ticker:"ETH",     annualFee:0,    invested:2149 },
-  { id:"btc",    platform:"Binance",    name:"BTC",                value:1329, type:"crypto", region:"Crypto", ticker:"BTC",     annualFee:0,    invested:1329 },
-  { id:"sol",    platform:"Binance",    name:"SOL",                value:334,  type:"crypto", region:"Crypto", ticker:"SOL",     annualFee:0,    invested:334  },
-  { id:"stable", platform:"Binance",    name:"USDT/DAI",           value:125,  type:"crypto", region:"Crypto", ticker:null,      annualFee:0,    invested:125  },
-  { id:"amw",    platform:"BBVA Spain", name:"Amundi World Eq.",   value:2720, type:"fund",   region:"Global", ticker:null,      annualFee:0.38, invested:2720 },
-  { id:"amb",    platform:"BBVA Spain", name:"Amundi Bond Agg.",   value:304,  type:"fund",   region:"Global", ticker:null,      annualFee:0.15, invested:304  },
-  { id:"rev",    platform:"Revolut",    name:"Emergency Cash",     value:2001, type:"cash",   region:"EU",     ticker:null,      annualFee:0,    invested:2001 },
+  { id:"nvda",   platform:"eToro",      name:"NVDA",               value:2800, type:"stock",  region:"US",     ticker:"NVDA",    annualFee:0,    invested:2800, units:null },
+  { id:"sxr8",   platform:"eToro",      name:"SXR8 (S&P 500 ETF)", value:2400, type:"etf",    region:"US",     ticker:"SXR8.DE", annualFee:0.07, invested:2400, units:null },
+  { id:"qdve",   platform:"eToro",      name:"QDVE (Tech ETF)",    value:1800, type:"etf",    region:"US",     ticker:"QDVE.MI", annualFee:0.35, invested:1800, units:null },
+  { id:"net",    platform:"eToro",      name:"NET",                value:900,  type:"stock",  region:"US",     ticker:"NET",     annualFee:0,    invested:900,  units:null },
+  { id:"aapl",   platform:"eToro",      name:"AAPL",               value:850,  type:"stock",  region:"US",     ticker:"AAPL",    annualFee:0,    invested:850,  units:null },
+  { id:"msft",   platform:"eToro",      name:"MSFT",               value:820,  type:"stock",  region:"US",     ticker:"MSFT",    annualFee:0,    invested:820,  units:null },
+  { id:"meli",   platform:"eToro",      name:"MELI",               value:750,  type:"stock",  region:"EM",     ticker:"MELI",    annualFee:0,    invested:750,  units:null },
+  { id:"ddog",   platform:"eToro",      name:"DDOG",               value:600,  type:"stock",  region:"US",     ticker:"DDOG",    annualFee:0,    invested:600,  units:null },
+  { id:"vrtx",   platform:"eToro",      name:"VRTX",               value:550,  type:"stock",  region:"US",     ticker:"VRTX",    annualFee:0,    invested:550,  units:null },
+  { id:"abbv",   platform:"eToro",      name:"ABBV",               value:500,  type:"stock",  region:"US",     ticker:"ABBV",    annualFee:0,    invested:500,  units:null },
+  { id:"vgwd",   platform:"eToro",      name:"VGWD (Dividend ETF)",value:480,  type:"etf",    region:"EU",     ticker:"VHYD.AS", annualFee:0.29, invested:480,  units:null },
+  { id:"idem",   platform:"eToro",      name:"IDEM (Italy ETF)",   value:320,  type:"etf",    region:"EU",     ticker:"IDEM.MI", annualFee:0.35, invested:320,  units:null },
+  { id:"bayn",   platform:"eToro",      name:"BAYN",               value:290,  type:"stock",  region:"EU",     ticker:"BAYN.DE", annualFee:0,    invested:290,  units:null },
+  { id:"ypf",    platform:"eToro",      name:"YPF",                value:280,  type:"stock",  region:"EM",     ticker:"YPF",     annualFee:0,    invested:280,  units:null },
+  { id:"vrns",   platform:"eToro",      name:"VRNS",               value:210,  type:"stock",  region:"US",     ticker:"VRNS",    annualFee:0,    invested:210,  units:null },
+  { id:"other",  platform:"eToro",      name:"Other",              value:390,  type:"stock",  region:"US",     ticker:null,      annualFee:0,    invested:390,  units:null },
+  { id:"eth",    platform:"Binance",    name:"ETH",                value:2149, type:"crypto", region:"Crypto", ticker:"ETH",     annualFee:0,    invested:2149, units:null },
+  { id:"btc",    platform:"Binance",    name:"BTC",                value:1329, type:"crypto", region:"Crypto", ticker:"BTC",     annualFee:0,    invested:1329, units:null },
+  { id:"sol",    platform:"Binance",    name:"SOL",                value:334,  type:"crypto", region:"Crypto", ticker:"SOL",     annualFee:0,    invested:334,  units:null },
+  { id:"stable", platform:"Binance",    name:"USDT/DAI",           value:125,  type:"crypto", region:"Crypto", ticker:null,      annualFee:0,    invested:125,  units:null },
+  { id:"amw",    platform:"BBVA Spain", name:"Amundi World Eq.",   value:2720, type:"fund",   region:"Global", ticker:null,      annualFee:0.38, invested:2720, units:null },
+  { id:"amb",    platform:"BBVA Spain", name:"Amundi Bond Agg.",   value:304,  type:"fund",   region:"Global", ticker:null,      annualFee:0.15, invested:304,  units:null },
+  { id:"rev",    platform:"Revolut",    name:"Emergency Cash",     value:2001, type:"cash",   region:"EU",     ticker:null,      annualFee:0,    invested:2001, units:null },
 ];
 
 const RESEARCH_PRESETS = [
@@ -314,7 +314,7 @@ export default function App() {
   const [modal, setModal]                 = useState(null);
   const [editingId, setEditingId]         = useState(null);
   const [editVal, setEditVal]             = useState("");
-  const [newPos, setNewPos]               = useState({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US"});
+  const [newPos, setNewPos]               = useState({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",units:""});
   const [showAddForm, setShowAddForm]     = useState(false);
   const [savedFlash, setSavedFlash]       = useState(false);
   // Apply modal state
@@ -341,8 +341,8 @@ export default function App() {
   function addPosition(){
     if(!newPos.name.trim()||!newPos.value)return;
     const val=parseFloat(newPos.value)||0;
-    setPositions(ps=>[...ps,{...newPos,id:Date.now().toString(),value:val,invested:parseFloat(newPos.invested)||val,annualFee:parseFloat(newPos.annualFee)||0,ticker:newPos.ticker||null}]);
-    setNewPos({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US"});
+    setPositions(ps=>[...ps,{...newPos,id:Date.now().toString(),value:val,invested:parseFloat(newPos.invested)||val,annualFee:parseFloat(newPos.annualFee)||0,ticker:newPos.ticker||null,units:parseFloat(newPos.units)||null}]);
+    setNewPos({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",units:""});
     setShowAddForm(false);flash();
   }
   function flash(){setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);}
@@ -354,7 +354,16 @@ export default function App() {
       const tickers = {};
       positions.forEach(p => { if (p.ticker) tickers[p.id] = p.ticker; });
       const result = await api.prices(tickers);
-      setPriceData(result.prices || {});
+      const prices = result.prices || {};
+      setPriceData(prices);
+      // Auto-update position values for entries where units are set
+      setPositions(ps => ps.map(p => {
+        const lp = prices[p.id];
+        if (lp && p.units != null && p.units > 0) {
+          return { ...p, value: Math.round(p.units * lp.priceEur * 100) / 100 };
+        }
+        return p;
+      }));
     } catch (e) { console.error("Price refresh failed:", e); }
     setPricesLoading(false);
   }
@@ -489,56 +498,66 @@ Rules:
   return (
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:"'DM Mono','Fira Code','Courier New',monospace",paddingBottom:60}}>
 
-      <div style={{padding:"22px 22px 0",borderBottom:`1px solid ${C.bdr}`}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          <div>
-            <p style={{fontSize:20,fontWeight:700,color:"#f8fafc",margin:0,letterSpacing:"-0.5px"}}>⬡ Portfolio Advisor</p>
-            <p style={{fontSize:12,color:C.mut,margin:"3px 0 14px"}}>Total: <strong style={{color:"#34d399"}}>€{Math.round(base).toLocaleString()}</strong>{(()=>{const ti=positions.reduce((s,p)=>s+(p.invested??p.value),0);const pnl=base-ti;if(!ti||pnl===0)return null;const pct=(pnl/ti)*100;return <span style={{color:pnl>=0?"#34d399":"#f87171",marginLeft:6}}>{pnl>=0?"+":""}{Math.round(pnl).toLocaleString()}€ ({pct.toFixed(1)}%)</span>;})()}<span style={{color:C.sub}}> · {positions.length} positions{msgCount>0?` · ${msgCount} AI messages`:""}</span></p>
+      <div style={{borderBottom:`1px solid ${C.bdr}`}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"18px 32px 0"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"baseline",gap:16}}>
+              <p style={{fontSize:18,fontWeight:700,color:"#f8fafc",margin:0,letterSpacing:"-0.5px"}}>⬡ Portfolio Advisor</p>
+              <p style={{fontSize:13,color:C.mut,margin:0}}>Total: <strong style={{color:"#34d399",fontSize:15}}>€{Math.round(base).toLocaleString()}</strong>{(()=>{const ti=positions.reduce((s,p)=>s+(p.invested??p.value),0);const pnl=base-ti;if(!ti||pnl===0)return null;const pct=(pnl/ti)*100;return <span style={{color:pnl>=0?"#34d399":"#f87171",marginLeft:6}}>{pnl>=0?"+":""}{Math.round(pnl).toLocaleString()}€ ({pct.toFixed(1)}%)</span>;})()}<span style={{color:C.sub}}> · {positions.length} positions{msgCount>0?` · ${msgCount} AI messages`:""}</span></p>
+            </div>
+            <button onClick={()=>api.logout().finally(()=>setAuthed(false))} style={{fontSize:11,color:C.sub,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"5px 12px",cursor:"pointer",fontFamily:"inherit"}}>sign out</button>
           </div>
-          <button onClick={()=>api.logout().finally(()=>setAuthed(false))} style={{fontSize:11,color:C.sub,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit",marginTop:4}}>sign out</button>
-        </div>
-        <div style={{display:"flex",overflowX:"auto"}}>
-          {[["allocate","💰 Allocate"],["breakdown","📊 Breakdown"],["portfolio","✏️ Portfolio"],["research","🔍 Research"],["ask","💬 Advisor"]].map(([t,l])=>(
-            <button key={t} onClick={()=>setTab(t)} style={{padding:"9px 12px",fontSize:11,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",background:"none",border:"none",borderBottom:tab===t?`2px solid ${C.acc}`:"2px solid transparent",color:tab===t?C.acc:C.sub,textTransform:"uppercase",letterSpacing:"0.05em",position:"relative"}}>
-              {l}{t==="ask"&&msgCount>0&&<span style={{position:"absolute",top:6,right:4,width:6,height:6,borderRadius:"50%",background:C.acc}}/>}
-            </button>
-          ))}
+          <div style={{display:"flex",gap:4}}>
+            {[["allocate","💰 Allocate"],["breakdown","📊 Breakdown"],["portfolio","✏️ Portfolio"],["research","🔍 Research"],["ask","💬 Advisor"]].map(([t,l])=>(
+              <button key={t} onClick={()=>setTab(t)} style={{padding:"9px 16px",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",background:"none",border:"none",borderBottom:tab===t?`2px solid ${C.acc}`:"2px solid transparent",color:tab===t?C.acc:C.sub,textTransform:"uppercase",letterSpacing:"0.05em",position:"relative"}}>
+                {l}{t==="ask"&&msgCount>0&&<span style={{position:"absolute",top:6,right:6,width:6,height:6,borderRadius:"50%",background:C.acc}}/>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div style={{padding:"18px 22px"}}>
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"24px 32px"}}>
 
         {tab==="allocate"&&<>
-          <div style={card}><div style={lbl}>New Money to Allocate</div><div style={{display:"flex",alignItems:"center",gap:12}}><input type="range" min={100} max={5000} step={50} value={newMoney} onChange={e=>setNewMoney(+e.target.value)} style={{flex:1,accentColor:C.acc}}/><span style={{fontSize:17,fontWeight:700,color:C.acc,minWidth:58,textAlign:"right"}}>€{newMoney}</span></div></div>
-          <div style={{background:remaining<0?"#2d1010":remaining===0?"#0d2d1a":"#161c2a",border:`1px solid ${remaining<0?"#ef4444":remaining===0?"#10b981":C.bdr}`,borderRadius:8,padding:"10px 14px",fontSize:12,marginBottom:14,color:remaining<0?"#f87171":remaining===0?"#34d399":C.mut,display:"flex",justifyContent:"space-between"}}><span>{remaining<0?"⚠ Over-allocated by":remaining===0?"✓ Fully allocated":"Unallocated"}</span><span style={{fontWeight:700}}>{remaining<0?`-€${Math.abs(remaining)}`:`€${remaining}`}</span></div>
-          <div style={card}><div style={lbl}>Where to put it</div>{Object.entries(allocation).map(([key,val])=><div key={key} style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:"#94a3b8"}}>{key}</span><span style={{fontSize:12,fontWeight:700,color:C.acc}}>€{val}</span></div><input type="range" min={0} max={newMoney} step={25} value={val} onChange={e=>setAllocation(a=>({...a,[key]:+e.target.value}))} style={{width:"100%",accentColor:C.acc}}/></div>)}</div>
-          <div style={{...card,background:"#0d1f16",border:"1px solid #134e2a",marginBottom:16}}><div style={lbl}>Projected Total</div><div style={{fontSize:24,fontWeight:700,color:"#34d399"}}>€{Math.round(base+allocated).toLocaleString()}</div><div style={{fontSize:12,color:C.sub,marginTop:2}}>+€{allocated} · {((allocated/base)*100).toFixed(1)}% growth</div></div>
-          <button onClick={getAdvice} disabled={chatLoading} style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:chatLoading?"#1a2030":"linear-gradient(135deg,#0ea5e9,#22d3ee)",color:chatLoading?C.mut:"#0b0f1a",fontWeight:700,fontSize:13,cursor:chatLoading?"default":"pointer",fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em"}}>{chatLoading?"⟳ Thinking…":"✦ Get AI Advice on This Allocation →"}</button>
-          <div style={{fontSize:11,color:C.mut,textAlign:"center",marginTop:7}}>{msgCount>0?`Adds to your ongoing conversation (${msgCount} messages so far)`:"Starts a new conversation in the Advisor tab"}</div>
-
-          <div style={{...card,marginTop:16}}>
-            <div style={lbl}>Platform Fees Reference</div>
-            {Object.entries(PLATFORM_FEE_INFO).map(([plat,info])=>(
-              <div key={plat} style={{marginBottom:12,paddingBottom:12,borderBottom:`1px solid ${C.bdr}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6}}>
-                    <div style={{width:7,height:7,borderRadius:2,background:PLATFORM_COLORS[plat]||"#64748b"}}/>
-                    <span style={{fontSize:12,fontWeight:700,color:C.text}}>{plat}</span>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 380px",gap:20,alignItems:"start"}}>
+            <div>
+              <div style={card}><div style={lbl}>New Money to Allocate</div><div style={{display:"flex",alignItems:"center",gap:12}}><input type="range" min={100} max={5000} step={50} value={newMoney} onChange={e=>setNewMoney(+e.target.value)} style={{flex:1,accentColor:C.acc}}/><span style={{fontSize:18,fontWeight:700,color:C.acc,minWidth:58,textAlign:"right"}}>€{newMoney}</span></div></div>
+              <div style={{background:remaining<0?"#2d1010":remaining===0?"#0d2d1a":"#161c2a",border:`1px solid ${remaining<0?"#ef4444":remaining===0?"#10b981":C.bdr}`,borderRadius:8,padding:"10px 14px",fontSize:12,marginBottom:14,color:remaining<0?"#f87171":remaining===0?"#34d399":C.mut,display:"flex",justifyContent:"space-between"}}><span>{remaining<0?"⚠ Over-allocated by":remaining===0?"✓ Fully allocated":"Unallocated"}</span><span style={{fontWeight:700}}>{remaining<0?`-€${Math.abs(remaining)}`:`€${remaining}`}</span></div>
+              <div style={card}><div style={lbl}>Where to put it</div>{Object.entries(allocation).map(([key,val])=><div key={key} style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:"#94a3b8"}}>{key}</span><span style={{fontSize:12,fontWeight:700,color:C.acc}}>€{val}</span></div><input type="range" min={0} max={newMoney} step={25} value={val} onChange={e=>setAllocation(a=>({...a,[key]:+e.target.value}))} style={{width:"100%",accentColor:C.acc}}/></div>)}</div>
+            </div>
+            <div style={{position:"sticky",top:20}}>
+              <div style={{...card,background:"#0d1f16",border:"1px solid #134e2a",marginBottom:14}}><div style={lbl}>Projected Total</div><div style={{fontSize:28,fontWeight:700,color:"#34d399"}}>€{Math.round(base+allocated).toLocaleString()}</div><div style={{fontSize:12,color:C.sub,marginTop:4}}>+€{allocated} · {((allocated/base)*100).toFixed(1)}% growth</div></div>
+              <button onClick={getAdvice} disabled={chatLoading} style={{width:"100%",padding:"14px",borderRadius:10,border:"none",background:chatLoading?"#1a2030":"linear-gradient(135deg,#0ea5e9,#22d3ee)",color:chatLoading?C.mut:"#0b0f1a",fontWeight:700,fontSize:13,cursor:chatLoading?"default":"pointer",fontFamily:"'DM Mono',monospace",letterSpacing:"0.04em",marginBottom:8}}>{chatLoading?"⟳ Thinking…":"✦ Get AI Advice on This Allocation →"}</button>
+              <div style={{fontSize:11,color:C.mut,textAlign:"center",marginBottom:16}}>{msgCount>0?`Adds to your ongoing conversation (${msgCount} messages so far)`:"Starts a new conversation in the Advisor tab"}</div>
+              <div style={card}>
+                <div style={lbl}>Platform Fees Reference</div>
+                {Object.entries(PLATFORM_FEE_INFO).map(([plat,info])=>(
+                  <div key={plat} style={{marginBottom:12,paddingBottom:12,borderBottom:`1px solid ${C.bdr}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <div style={{width:7,height:7,borderRadius:2,background:PLATFORM_COLORS[plat]||"#64748b"}}/>
+                        <span style={{fontSize:12,fontWeight:700,color:C.text}}>{plat}</span>
+                      </div>
+                      <span style={{fontSize:12,color:C.acc,fontWeight:600}}>{info.rate}</span>
+                    </div>
+                    <div style={{fontSize:11,color:C.sub}}>{info.note}</div>
                   </div>
-                  <span style={{fontSize:12,color:C.acc,fontWeight:600}}>{info.rate}</span>
-                </div>
-                <div style={{fontSize:11,color:C.sub}}>{info.note}</div>
+                ))}
+                <div style={{fontSize:11,color:C.sub,paddingTop:2}}>ETF/fund annual fees (TER) are shown per position in the Portfolio tab. These are separate from transaction costs.</div>
               </div>
-            ))}
-            <div style={{fontSize:11,color:C.sub,paddingTop:2}}>ETF/fund annual fees (TER) are shown per position in the Portfolio tab. These are separate from transaction costs.</div>
+            </div>
           </div>
         </>}
 
         {tab==="breakdown"&&<>
-          {[[{title:"By Region — Now",data:byRegion,colors:REGION_COLORS},{title:"By Region — After",data:projByRegion,colors:REGION_COLORS}],[{title:"By Type — Now",data:byType,colors:TYPE_COLORS},{title:"By Type — After",data:projByType,colors:TYPE_COLORS}]].map((pair,ri)=>(
-            <div key={ri} style={{display:"flex",gap:10,marginBottom:10}}>{pair.map(({title,data,colors})=><div key={title} style={{flex:1,background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:10,padding:12}}><div style={lbl}>{title}</div><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:10}}><Donut data={data} colors={colors} size={108} onClick={()=>setModal({title,data,colors})}/><Legend data={data} colors={colors}/></div></div>)}</div>
-          ))}
-          <div style={card}><div style={lbl}>By Platform</div>{platforms.map(plat=>{const pv=positions.filter(p=>p.platform===plat).reduce((s,p)=>s+p.value,0);const pct=(pv/base)*100;return <div key={plat} style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:8,height:8,borderRadius:2,background:PLATFORM_COLORS[plat]||"#64748b"}}/><span style={{fontSize:12,color:"#94a3b8"}}>{plat}</span></div><div style={{display:"flex",gap:10}}><span style={{fontSize:11,color:C.sub}}>€{Math.round(pv).toLocaleString()}</span><span style={{fontSize:12,color:C.text,fontWeight:700,minWidth:36,textAlign:"right"}}>{pct.toFixed(1)}%</span></div></div><div style={{height:4,background:"#1e293b",borderRadius:2}}><div style={{height:"100%",width:`${pct}%`,background:PLATFORM_COLORS[plat]||"#64748b",borderRadius:2}}/></div></div>;})}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:14,marginBottom:14}}>
+            {[{title:"By Region — Now",data:byRegion,colors:REGION_COLORS},{title:"By Region — After",data:projByRegion,colors:REGION_COLORS},{title:"By Type — Now",data:byType,colors:TYPE_COLORS},{title:"By Type — After",data:projByType,colors:TYPE_COLORS}].map(({title,data,colors})=>(
+              <div key={title} style={{background:C.surf,border:`1px solid ${C.bdr}`,borderRadius:10,padding:16}}><div style={lbl}>{title}</div><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:12}}><Donut data={data} colors={colors} size={130} onClick={()=>setModal({title,data,colors})}/><Legend data={data} colors={colors}/></div></div>
+            ))}
+          </div>
+          <div style={card}><div style={lbl}>By Platform</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>{platforms.map(plat=>{const pv=positions.filter(p=>p.platform===plat).reduce((s,p)=>s+p.value,0);const pct=(pv/base)*100;return <div key={plat}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:8,height:8,borderRadius:2,background:PLATFORM_COLORS[plat]||"#64748b"}}/><span style={{fontSize:12,color:"#94a3b8"}}>{plat}</span></div><div style={{display:"flex",gap:10}}><span style={{fontSize:11,color:C.sub}}>€{Math.round(pv).toLocaleString()}</span><span style={{fontSize:12,color:C.text,fontWeight:700,minWidth:36,textAlign:"right"}}>{pct.toFixed(1)}%</span></div></div><div style={{height:5,background:"#1e293b",borderRadius:2}}><div style={{height:"100%",width:`${pct}%`,background:PLATFORM_COLORS[plat]||"#64748b",borderRadius:2}}/></div></div>;})}
+          </div></div>
         </>}
 
         {tab==="portfolio"&&<>
@@ -558,11 +577,13 @@ Rules:
             <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TYPE</div><select style={{...inp,cursor:"pointer"}} value={newPos.type} onChange={e=>setNewPos(p=>({...p,type:e.target.value}))}>{["stock","etf","crypto","fund","cash"].map(t=><option key={t}>{t}</option>)}</select></div>
             <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>REGION</div><select style={{...inp,cursor:"pointer"}} value={newPos.region} onChange={e=>setNewPos(p=>({...p,region:e.target.value}))}>{["US","EU","EM","Crypto","Global"].map(r=><option key={r}>{r}</option>)}</select></div>
             <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER (for price fetch)</div><input style={inp} placeholder="e.g. AAPL, BTC, SXR8.DE" value={newPos.ticker||""} onChange={e=>setNewPos(p=>({...p,ticker:e.target.value}))}/></div>
+            <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>NO. OF UNITS / SHARES</div><input style={inp} type="number" placeholder="e.g. 5.25" step="0.0001" value={newPos.units||""} onChange={e=>setNewPos(p=>({...p,units:e.target.value}))}/><div style={{fontSize:9,color:C.sub,marginTop:3}}>Set this so live prices auto-update the value</div></div>
           </div><button onClick={addPosition} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:C.acc,color:"#0b0f1a",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Add Position</button></div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,alignItems:"start"}}>
           {platforms.map(plat=>{
             const platPos=positions.filter(p=>p.platform===plat);
             const platTotal=platPos.reduce((s,p)=>s+p.value,0);
-            return <div key={plat} style={card}>
+            return <div key={plat} style={{...card,marginBottom:0}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
                   <div style={{width:9,height:9,borderRadius:2,background:PLATFORM_COLORS[plat]||"#64748b"}}/>
@@ -575,15 +596,15 @@ Rules:
                 const pnl=pos.value-invested;
                 const pnlPct=invested>0?(pnl/invested)*100:0;
                 const lp=priceData[pos.id];
-                return <div key={pos.id} style={{padding:"8px 0",borderBottom:`1px solid ${C.bdr}`}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                return <div key={pos.id} style={{padding:"10px 0",borderBottom:`1px solid ${C.bdr}`}}>
+                  <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,color:C.text,fontWeight:500}}>{pos.name}</div>
-                      <div style={{fontSize:10,color:C.sub,marginTop:1,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                      <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}{pos.units!=null&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.units} units</span>}</div>
+                      <div style={{fontSize:10,color:C.sub,marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                         <span style={{color:TYPE_COLORS[pos.type]||C.sub}}>{pos.type}</span>
                         <span>· {pos.region}</span>
                         {pos.annualFee>0&&<span style={{color:"#f59e0b",background:"#1a150a",border:"1px solid #3d2e0a",borderRadius:3,padding:"0 4px"}}>{pos.annualFee}% p.a.</span>}
-                        {lp&&<span style={{color:lp.change24h>=0?"#34d399":"#f87171",background:lp.change24h>=0?"#0a1f14":"#1f0a0a",border:`1px solid ${lp.change24h>=0?"#134e2a":"#4e1313"}`,borderRadius:3,padding:"0 4px"}}>€{lp.priceEur<10?lp.priceEur.toFixed(4):lp.priceEur<100?lp.priceEur.toFixed(2):Math.round(lp.priceEur).toLocaleString()} {lp.change24h>=0?"+":""}{lp.change24h.toFixed(1)}%</span>}
+                        {lp&&<span style={{color:lp.change24h>=0?"#34d399":"#f87171",background:lp.change24h>=0?"#0a1f14":"#1f0a0a",border:`1px solid ${lp.change24h>=0?"#134e2a":"#4e1313"}`,borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>€{lp.priceEur<10?lp.priceEur.toFixed(4):lp.priceEur<100?lp.priceEur.toFixed(2):Math.round(lp.priceEur).toLocaleString()} / unit {lp.change24h>=0?"+":""}{lp.change24h.toFixed(1)}%</span>}
                       </div>
                     </div>
                     {editingId===pos.id
@@ -595,8 +616,11 @@ Rules:
                       </div>
                       :<div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                         <div style={{textAlign:"right"}}>
-                          <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());}} style={{fontSize:13,color:C.text,fontWeight:600,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit"}}>€{pos.value.toLocaleString()}</button>
-                          {pnl!==0&&<div style={{fontSize:10,color:pnl>=0?"#34d399":"#f87171",marginTop:2,textAlign:"right"}}>{pnl>=0?"+":""}{Math.round(pnl).toLocaleString()}€ ({pnlPct.toFixed(1)}%)</div>}
+                          <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit"}}>€{pos.value.toLocaleString()}</button>
+                          <div style={{fontSize:10,marginTop:3,textAlign:"right",display:"flex",gap:6,justifyContent:"flex-end",alignItems:"center"}}>
+                            <span style={{color:C.sub}}>invested €{Math.round(invested).toLocaleString()}</span>
+                            {pnl!==0&&<span style={{color:pnl>=0?"#34d399":"#f87171"}}>{pnl>=0?"+":""}{Math.round(pnl).toLocaleString()}€ ({pnlPct.toFixed(1)}%)</span>}
+                          </div>
                         </div>
                         <button onClick={()=>deletePosition(pos.id)} style={{fontSize:14,color:"#475569",background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1}}>×</button>
                       </div>
@@ -606,12 +630,19 @@ Rules:
               })}
             </div>;
           })}
-          <button onClick={()=>{if(window.confirm("Reset to defaults?"))setPositions(DEFAULT_PORTFOLIO);}} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid #3d1515",background:"none",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>Reset to defaults</button>
+          </div>
+          <button onClick={()=>{if(window.confirm("Reset to defaults?"))setPositions(DEFAULT_PORTFOLIO);}} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid #3d1515",background:"none",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:"inherit",marginTop:14}}>Reset to defaults</button>
         </>}
 
         {tab==="research"&&<>
-          <div style={{...card,marginBottom:14}}><div style={lbl}>Live Research Topics</div><div style={{fontSize:11,color:C.sub,marginBottom:12}}>AI-powered · ~10 seconds · separate from your main conversation</div>{RESEARCH_PRESETS.map(p=><button key={p.id} onClick={()=>runResearch(p)} disabled={resLoading} style={{width:"100%",padding:"11px 14px",marginBottom:8,borderRadius:8,textAlign:"left",border:researchId===p.id?`1px solid ${C.acc}`:`1px solid ${C.bdr}`,background:researchId===p.id?"#0f2231":C.surf,color:researchId===p.id?C.acc:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'DM Mono',monospace"}}>{p.label}</button>)}</div>
-          {(resLoading||researchText)&&<div style={{background:"#0d1117",border:`1px solid ${C.bdr}`,borderRadius:10,padding:20,minHeight:100}}>{resLoading?<span style={{color:C.sub}}>⟳ Thinking…</span>:<Markdown text={researchText}/>}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:20,alignItems:"start"}}>
+            <div style={card}><div style={lbl}>Topics</div><div style={{fontSize:11,color:C.sub,marginBottom:12}}>AI-powered · ~10s · separate from advisor</div>{RESEARCH_PRESETS.map(p=><button key={p.id} onClick={()=>runResearch(p)} disabled={resLoading} style={{width:"100%",padding:"10px 12px",marginBottom:8,borderRadius:8,textAlign:"left",border:researchId===p.id?`1px solid ${C.acc}`:`1px solid ${C.bdr}`,background:researchId===p.id?"#0f2231":C.surf,color:researchId===p.id?C.acc:"#94a3b8",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'DM Mono',monospace"}}>{p.label}</button>)}</div>
+            <div style={{background:"#0d1117",border:`1px solid ${C.bdr}`,borderRadius:10,padding:24,minHeight:200}}>
+              {!resLoading&&!researchText&&<div style={{color:C.sub,fontSize:12}}>Select a topic to the left to run a research query.</div>}
+              {resLoading&&<span style={{color:C.sub}}>⟳ Thinking…</span>}
+              {!resLoading&&researchText&&<Markdown text={researchText}/>}
+            </div>
+          </div>
         </>}
 
         {tab==="ask"&&<>
@@ -620,7 +651,7 @@ Rules:
             {msgCount>0&&<button onClick={clearChat} style={{fontSize:11,color:"#ef4444",background:"none",border:"1px solid #3d1515",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"'DM Mono',monospace"}}>clear all</button>}
           </div>
 
-          <div style={{background:"#0d1117",border:`1px solid ${C.bdr}`,borderRadius:10,padding:chatMessages.length>0?16:20,marginBottom:12,minHeight:200,maxHeight:500,overflowY:"auto"}}>
+          <div style={{background:"#0d1117",border:`1px solid ${C.bdr}`,borderRadius:10,padding:chatMessages.length>0?16:20,marginBottom:12,minHeight:300,maxHeight:"calc(100vh - 320px)",overflowY:"auto"}}>
             {chatMessages.length===0&&!chatLoading&&(
               <div style={{color:C.sub,fontSize:12,lineHeight:1.8}}>
                 <div style={{color:C.acc,fontWeight:700,marginBottom:12}}>Your personal investment advisor</div>
