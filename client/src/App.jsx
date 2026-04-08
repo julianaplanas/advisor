@@ -442,8 +442,9 @@ export default function App() {
           : [{ date: null, invested: p.invested ?? p.value, units: p.units ?? null }];
         const lots = [...existingLots, newLot];
         const totalInvested = lots.reduce((s, l) => s + l.invested, 0);
-        const totalUnits = lots.every(l => l.units != null) ? lots.reduce((s, l) => s + l.units, 0) : null;
-        // Keep value = totalInvested for now; live price refresh will correct it
+        // Sum only lots that have valid units — partial is fine, null lots just aren't auto-tracked
+        const knownUnits = lots.filter(l => l.units != null && !isNaN(l.units) && l.units > 0);
+        const totalUnits = knownUnits.length > 0 ? knownUnits.reduce((s, l) => s + l.units, 0) : null;
         return { ...p, lots, invested: totalInvested, units: totalUnits, value: totalInvested };
       }));
     } else {
@@ -454,7 +455,7 @@ export default function App() {
         invested: investedAmt,
         annualFee: parseFloat(newPos.annualFee) || 0,
         ticker,
-        units,
+        units: (units != null && !isNaN(units) && units > 0) ? units : null,
         lots: [newLot],
       }]);
     }
@@ -773,6 +774,7 @@ Rules:
                 const lp = priceData[pos.id];
                 const isAuto = !!(lp && pos.units > 0);
                 const noTicker = !pos.ticker;
+                const hasPartialLots = pos.lots && pos.lots.some(l => !l.units) && pos.lots.some(l => l.units > 0);
                 // current value: auto if units+price, else manual only for no-ticker assets
                 const currentValue = isAuto
                   ? Math.round(pos.units * lp.priceEur * 100) / 100
@@ -783,7 +785,7 @@ Rules:
                   <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}
-                        {pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.lots.length} purchases</span>}
+                        {pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.lots.length} purchases{hasPartialLots&&<span style={{color:"#f59e0b"}}> · partial tracking</span>}</span>}
                         {pos.lots?.length===1&&pos.lots[0].date&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>since {pos.lots[0].date}</span>}
                       </div>
                       <div style={{fontSize:10,color:C.sub,marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
