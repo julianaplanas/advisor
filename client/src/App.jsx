@@ -436,9 +436,14 @@ export default function App() {
     if (existing) {
       setPositions(ps => ps.map(p => {
         if (p.id !== existing.id) return p;
-        const lots = [...(p.lots || []), newLot];
+        // If position has no lots yet, wrap its existing data as a legacy lot so we don't lose it
+        const existingLots = p.lots && p.lots.length > 0
+          ? p.lots
+          : [{ date: null, invested: p.invested ?? p.value, units: p.units ?? null }];
+        const lots = [...existingLots, newLot];
         const totalInvested = lots.reduce((s, l) => s + l.invested, 0);
         const totalUnits = lots.every(l => l.units != null) ? lots.reduce((s, l) => s + l.units, 0) : null;
+        // Keep value = totalInvested for now; live price refresh will correct it
         return { ...p, lots, invested: totalInvested, units: totalUnits, value: totalInvested };
       }));
     } else {
@@ -458,6 +463,8 @@ export default function App() {
     setShowAddForm(false);
     setShowAdvancedAdd(false);
     flash();
+    // Auto-fetch live prices so current value shows immediately
+    if (ticker) setTimeout(() => refreshPrices(), 100);
   }
   function flash(){setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);}
   function clearChat(){if(!window.confirm("Clear the entire conversation history? This cannot be undone."))return;setChatMessages([]);}
