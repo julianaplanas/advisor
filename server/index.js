@@ -141,6 +141,81 @@ app.post("/api/ai", requireAuth, async (req, res) => {
   }
 });
 
+// ─── PRICE FETCHING ───────────────────────────────────────────────────────────
+const CRYPTO_IDS = { BTC:"bitcoin", ETH:"ethereum", SOL:"solana", MATIC:"matic-network", BNB:"binancecoin" };
+
+async function yfFetch(symbol) {
+  const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`, {
+    headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  const meta = d?.chart?.result?.[0]?.meta;
+  if (!meta?.regularMarketPrice) return null;
+  const prev = meta.chartPreviousClose || meta.regularMarketPrice;
+  return { price: meta.regularMarketPrice, currency: meta.currency, change24h: ((meta.regularMarketPrice - prev) / prev) * 100 };
+}
+
+app.post("/api/prices", requireAuth, async (req, res) => {
+  const { tickers } = req.body; // { [posId]: "NVDA" }
+  if (!tickers || typeof tickers !== "object") return res.json({ prices: {} });
+
+  const symbolToIds = {};
+  Object.entries(tickers).forEach(([id, sym]) => {
+    if (!sym) return;
+    if (!symbolToIds[sym]) symbolToIds[sym] = [];
+    symbolToIds[sym].push(id);
+  });
+
+  const symbols = Object.keys(symbolToIds);
+  if (!symbols.length) return res.json({ prices: {} });
+
+  // Separate crypto from stock/ETF
+  const cryptoSymbols = symbols.filter(s => CRYPTO_IDS[s.replace(/-EUR$/, "")]);
+  const stockSymbols  = symbols.filter(s => !cryptoSymbols.includes(s));
+
+  const rawPrices = {}; // symbol → { priceEur, change24h }
+
+  // Crypto via CoinGecko (returns EUR directly)
+  if (cryptoSymbols.length) {
+    const ids = [...new Set(cryptoSymbols.map(s => CRYPTO_IDS[s.replace(/-EUR$/, "")]).filter(Boolean))];
+    try {
+      const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}&vs_currencies=eur&include_24hr_change=true`, { headers: { Accept: "application/json" } });
+      const data = await r.json();
+      cryptoSymbols.forEach(sym => {
+        const base = sym.replace(/-EUR$/, "");
+        const cgId = CRYPTO_IDS[base];
+        if (data[cgId]) rawPrices[sym] = { priceEur: data[cgId].eur, change24h: data[cgId].eur_24h_change || 0 };
+      });
+    } catch (e) { console.error("CoinGecko error:", e.message); }
+  }
+
+  // EUR/USD for stock conversion
+  let eurUsd = 1.1;
+  if (stockSymbols.length) {
+    try { const fx = await yfFetch("EURUSD=X"); if (fx) eurUsd = fx.price; } catch {}
+  }
+
+  // Stocks/ETFs via Yahoo Finance (parallel)
+  await Promise.all(stockSymbols.map(async sym => {
+    const q = await yfFetch(sym).catch(() => null);
+    if (!q) return;
+    const priceEur = q.currency === "EUR" ? q.price
+      : q.currency === "USD" ? q.price / eurUsd
+      : q.currency === "GBp" ? (q.price / 100) * (1 / eurUsd) * 0.87  // approx GBX → EUR
+      : q.price;
+    rawPrices[sym] = { priceEur, change24h: q.change24h };
+  }));
+
+  // Map back to position IDs
+  const prices = {};
+  Object.entries(symbolToIds).forEach(([sym, ids]) => {
+    if (rawPrices[sym]) ids.forEach(id => { prices[id] = rawPrices[sym]; });
+  });
+
+  res.json({ prices });
+});
+
 // ─── STATIC CLIENT ────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, "../client/dist");
 if (fs.existsSync(clientDist)) {

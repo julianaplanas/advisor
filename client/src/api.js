@@ -27,5 +27,6 @@ export const api = {
   storageSet: (key, value) => request("PUT",    `/api/storage/${key}`, { value }),
   storageDel: (key)        => request("DELETE",  `/api/storage/${key}`),
 
-  ai: (system, messages)  => request("POST", "/api/ai", { system, messages }),
+  ai:     (system, messages) => request("POST", "/api/ai", { system, messages }),
+  prices: (tickers)          => request("POST", "/api/prices", { tickers }),
 };
