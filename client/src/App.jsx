@@ -377,9 +377,11 @@ export default function App() {
   const [editVal, setEditVal]             = useState("");
   const [editingInvestedId, setEditingInvestedId] = useState(null);
   const [editInvestedVal, setEditInvestedVal]     = useState("");
-  const [newPos, setNewPos]               = useState({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",units:""});
+  const [newPos, setNewPos]               = useState({platform:"eToro",name:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",purchaseDate:"",units:null});
   const [showAddForm, setShowAddForm]     = useState(false);
   const [showAdvancedAdd, setShowAdvancedAdd] = useState(false);
+  const [addingPos, setAddingPos]         = useState(false);
+  const [addError, setAddError]           = useState("");
   const [savedFlash, setSavedFlash]       = useState(false);
   // Apply modal state
   const [applyChanges, setApplyChanges]   = useState(null);
@@ -403,12 +405,59 @@ export default function App() {
   function saveValue(id){const num=parseFloat(editVal);if(!isNaN(num)&&num>=0){setPositions(ps=>ps.map(p=>p.id===id?{...p,value:num}:p));flash();}setEditingId(null);}
   function saveInvested(id){const num=parseFloat(editInvestedVal);if(!isNaN(num)&&num>=0){setPositions(ps=>ps.map(p=>p.id===id?{...p,invested:num}:p));flash();}setEditingInvestedId(null);}
   function deletePosition(id){setPositions(ps=>ps.filter(p=>p.id!==id));}
-  function addPosition(){
-    if(!newPos.name.trim()||!newPos.invested)return;
-    const invested=parseFloat(newPos.invested)||0;
-    setPositions(ps=>[...ps,{...newPos,id:Date.now().toString(),value:invested,invested,annualFee:parseFloat(newPos.annualFee)||0,ticker:newPos.ticker||null,units:parseFloat(newPos.units)||null}]);
-    setNewPos({platform:"eToro",name:"",value:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",units:""});
-    setShowAddForm(false);setShowAdvancedAdd(false);flash();
+  async function addPosition() {
+    if (!newPos.name.trim() || !newPos.invested) return;
+    const investedAmt = parseFloat(newPos.invested) || 0;
+    setAddError("");
+    let units = null;
+
+    const ticker = newPos.ticker || null;
+    if (ticker && newPos.purchaseDate) {
+      setAddingPos(true);
+      try {
+        const { priceEur } = await api.priceAtDate(ticker, newPos.purchaseDate);
+        units = investedAmt / priceEur;
+      } catch {
+        setAddError(`Couldn't fetch price for ${ticker} on ${newPos.purchaseDate}. Check the ticker or try a different date.`);
+        setAddingPos(false);
+        return;
+      }
+      setAddingPos(false);
+    }
+
+    const newLot = { date: newPos.purchaseDate || null, invested: investedAmt, units };
+
+    // Check if position already exists (match by ticker or name)
+    const existing = positions.find(p =>
+      (ticker && p.ticker && p.ticker.toUpperCase() === ticker.toUpperCase()) ||
+      p.name.toLowerCase() === newPos.name.trim().toLowerCase()
+    );
+
+    if (existing) {
+      setPositions(ps => ps.map(p => {
+        if (p.id !== existing.id) return p;
+        const lots = [...(p.lots || []), newLot];
+        const totalInvested = lots.reduce((s, l) => s + l.invested, 0);
+        const totalUnits = lots.every(l => l.units != null) ? lots.reduce((s, l) => s + l.units, 0) : null;
+        return { ...p, lots, invested: totalInvested, units: totalUnits, value: totalInvested };
+      }));
+    } else {
+      setPositions(ps => [...ps, {
+        ...newPos,
+        id: Date.now().toString(),
+        value: investedAmt,
+        invested: investedAmt,
+        annualFee: parseFloat(newPos.annualFee) || 0,
+        ticker,
+        units,
+        lots: [newLot],
+      }]);
+    }
+
+    setNewPos({platform:"eToro",name:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",purchaseDate:"",units:null});
+    setShowAddForm(false);
+    setShowAdvancedAdd(false);
+    flash();
   }
   function flash(){setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);}
   function clearChat(){if(!window.confirm("Clear the entire conversation history? This cannot be undone."))return;setChatMessages([]);}
@@ -518,7 +567,9 @@ Rules:
         if (amount <= 0) return;
         if (change.mode === "update" && change.positionId) {
           updated = updated.map(p =>
-            p.id === change.positionId ? { ...p, value: p.value + amount } : p
+            p.id === change.positionId
+              ? { ...p, value: p.value + amount, invested: (p.invested ?? p.value) + amount }
+              : p
           );
         } else {
           updated.push({
@@ -528,6 +579,8 @@ Rules:
             type: change.type,
             region: change.region,
             value: amount,
+            invested: amount,
+            units: null,
           });
         }
       });
@@ -635,13 +688,21 @@ Rules:
           </div>
           {showAddForm&&(()=>{
             const match = ASSET_LOOKUP[newPos.name.trim().toUpperCase()];
+            const ticker = match?.ticker || newPos.ticker;
+            const existingPos = newPos.name.trim() ? positions.find(p =>
+              (ticker && p.ticker && p.ticker.toUpperCase() === ticker.toUpperCase()) ||
+              p.name.toLowerCase() === newPos.name.trim().toLowerCase()
+            ) : null;
+            const lotsCount = existingPos?.lots?.length || (existingPos ? 1 : 0);
             return <div style={{...card,borderColor:"#1e3a5f",background:"#0d1826",marginBottom:14}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-                <div style={lbl}>New Position</div>
-                {match&&<span style={{fontSize:10,color:"#34d399",fontWeight:700}}>✓ {match.name} recognized — {match.type} · {match.region} · {match.platform}</span>}
+                <div style={lbl}>{existingPos ? "Add Purchase" : "New Position"}</div>
+                {existingPos
+                  ? <span style={{fontSize:10,color:"#f59e0b",fontWeight:700}}>+ adding to existing {existingPos.name} · {lotsCount} purchase{lotsCount!==1?"s":""} so far</span>
+                  : match&&<span style={{fontSize:10,color:"#34d399",fontWeight:700}}>✓ {match.name} recognized — {match.type} · {match.region} · {match.platform}</span>}
               </div>
 
-              {/* Primary fields — always visible */}
+              {/* Primary fields */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
                 <div>
                   <div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER / NAME</div>
@@ -655,30 +716,37 @@ Rules:
                 </div>
                 <div>
                   <div style={{fontSize:10,color:C.mut,marginBottom:4}}>AMOUNT INVESTED (€)</div>
-                  <input style={inp} type="number" placeholder="e.g. 500" value={newPos.invested} onChange={e=>setNewPos(p=>({...p,invested:e.target.value,value:e.target.value}))}/>
+                  <input style={inp} type="number" placeholder="e.g. 500" value={newPos.invested} onChange={e=>setNewPos(p=>({...p,invested:e.target.value}))}/>
                 </div>
                 <div>
-                  <div style={{fontSize:10,color:C.mut,marginBottom:4}}>NO. OF UNITS / SHARES</div>
-                  <input style={inp} type="number" placeholder="e.g. 5.25" step="0.0001" value={newPos.units||""} onChange={e=>setNewPos(p=>({...p,units:e.target.value}))}/>
-                  <div style={{fontSize:9,color:C.sub,marginTop:3}}>Optional · enables live price auto-update</div>
+                  <div style={{fontSize:10,color:C.mut,marginBottom:4}}>DATE OF PURCHASE</div>
+                  <input style={inp} type="date" value={newPos.purchaseDate} onChange={e=>setNewPos(p=>({...p,purchaseDate:e.target.value}))}/>
+                  {newPos.ticker&&newPos.purchaseDate
+                    ? <div style={{fontSize:9,color:"#34d399",marginTop:3}}>✓ units will be calculated automatically</div>
+                    : <div style={{fontSize:9,color:C.sub,marginTop:3}}>Enter to calculate units from historical price</div>}
                 </div>
               </div>
 
-              {/* Customize toggle */}
-              <button onClick={()=>setShowAdvancedAdd(v=>!v)} style={{fontSize:11,color:C.sub,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginBottom:showAdvancedAdd?10:14}}>
-                {showAdvancedAdd?"▾ hide details":"▸ customize platform, region, fees"}
+              {/* Customize toggle — only for new positions */}
+              {!existingPos&&<>
+                <button onClick={()=>setShowAdvancedAdd(v=>!v)} style={{fontSize:11,color:C.sub,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginBottom:showAdvancedAdd?10:14}}>
+                  {showAdvancedAdd?"▾ hide details":"▸ customize platform, region, fees"}
+                </button>
+                {showAdvancedAdd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10,paddingTop:8,borderTop:`1px solid ${C.bdr}`}}>
+                  <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>PLATFORM</div><select style={{...inp,cursor:"pointer"}} value={newPos.platform} onChange={e=>setNewPos(p=>({...p,platform:e.target.value}))}>{[...Object.keys(PLATFORM_COLORS),"Other"].map(pl=><option key={pl}>{pl}</option>)}</select></div>
+                  <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TYPE</div><select style={{...inp,cursor:"pointer"}} value={newPos.type} onChange={e=>setNewPos(p=>({...p,type:e.target.value}))}>{["stock","etf","crypto","fund","cash"].map(t=><option key={t}>{t}</option>)}</select></div>
+                  <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>REGION</div><select style={{...inp,cursor:"pointer"}} value={newPos.region} onChange={e=>setNewPos(p=>({...p,region:e.target.value}))}>{["US","EU","EM","Crypto","Global"].map(r=><option key={r}>{r}</option>)}</select></div>
+                  <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>ANNUAL FEE %</div><input style={inp} type="number" placeholder="0" step="0.01" value={newPos.annualFee} onChange={e=>setNewPos(p=>({...p,annualFee:e.target.value}))}/></div>
+                  <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER (for price fetch)</div><input style={inp} placeholder="e.g. AAPL, BTC, SXR8.DE" value={newPos.ticker||""} onChange={e=>setNewPos(p=>({...p,ticker:e.target.value}))}/></div>
+                  <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>DISPLAY NAME (override)</div><input style={inp} placeholder={newPos.name||"optional"} value={newPos.name} onChange={e=>setNewPos(p=>({...p,name:e.target.value}))}/></div>
+                </div>}
+              </>}
+
+              {addError&&<div style={{fontSize:11,color:"#f87171",background:"#2d1010",border:"1px solid #4e1313",borderRadius:6,padding:"8px 12px",marginBottom:10}}>{addError}</div>}
+
+              <button onClick={addPosition} disabled={addingPos} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:addingPos?"#1a2030":C.acc,color:addingPos?C.mut:"#0b0f1a",fontWeight:700,fontSize:12,cursor:addingPos?"default":"pointer",fontFamily:"inherit"}}>
+                {addingPos?"⟳ Fetching historical price…":existingPos?`Add Purchase to ${existingPos.name}`:"Add Position"}
               </button>
-
-              {showAdvancedAdd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10,paddingTop:8,borderTop:`1px solid ${C.bdr}`}}>
-                <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>PLATFORM</div><select style={{...inp,cursor:"pointer"}} value={newPos.platform} onChange={e=>setNewPos(p=>({...p,platform:e.target.value}))}>{[...Object.keys(PLATFORM_COLORS),"Other"].map(pl=><option key={pl}>{pl}</option>)}</select></div>
-                <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TYPE</div><select style={{...inp,cursor:"pointer"}} value={newPos.type} onChange={e=>setNewPos(p=>({...p,type:e.target.value}))}>{["stock","etf","crypto","fund","cash"].map(t=><option key={t}>{t}</option>)}</select></div>
-                <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>REGION</div><select style={{...inp,cursor:"pointer"}} value={newPos.region} onChange={e=>setNewPos(p=>({...p,region:e.target.value}))}>{["US","EU","EM","Crypto","Global"].map(r=><option key={r}>{r}</option>)}</select></div>
-                <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>ANNUAL FEE %</div><input style={inp} type="number" placeholder="0" step="0.01" value={newPos.annualFee} onChange={e=>setNewPos(p=>({...p,annualFee:e.target.value}))}/></div>
-                <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER (for price fetch)</div><input style={inp} placeholder="e.g. AAPL, BTC, SXR8.DE" value={newPos.ticker||""} onChange={e=>setNewPos(p=>({...p,ticker:e.target.value}))}/></div>
-                <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>DISPLAY NAME (override)</div><input style={inp} placeholder={newPos.name||"optional"} value={newPos.name} onChange={e=>setNewPos(p=>({...p,name:e.target.value}))}/></div>
-              </div>}
-
-              <button onClick={addPosition} style={{width:"100%",padding:"10px",borderRadius:8,border:"none",background:C.acc,color:"#0b0f1a",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Add Position</button>
             </div>;
           })()}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,alignItems:"start"}}>
@@ -696,14 +764,21 @@ Rules:
               {platPos.map(pos=>{
                 const invested = pos.invested ?? pos.value;
                 const lp = priceData[pos.id];
-                const isAuto = lp && pos.units > 0;
-                const currentValue = isAuto ? Math.round(pos.units * lp.priceEur * 100) / 100 : pos.value;
+                const isAuto = !!(lp && pos.units > 0);
+                const noTicker = !pos.ticker;
+                // current value: auto if units+price, else manual only for no-ticker assets
+                const currentValue = isAuto
+                  ? Math.round(pos.units * lp.priceEur * 100) / 100
+                  : noTicker ? pos.value : invested;
                 const pnl = currentValue - invested;
                 const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
                 return <div key={pos.id} style={{padding:"10px 0",borderBottom:`1px solid ${C.bdr}`}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}{pos.units!=null&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.units} units</span>}</div>
+                      <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}
+                        {pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.lots.length} purchases</span>}
+                        {pos.lots?.length===1&&pos.lots[0].date&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>since {pos.lots[0].date}</span>}
+                      </div>
                       <div style={{fontSize:10,color:C.sub,marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                         <span style={{color:TYPE_COLORS[pos.type]||C.sub}}>{pos.type}</span>
                         <span>· {pos.region}</span>
@@ -714,28 +789,34 @@ Rules:
 
                     <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
                       <div style={{textAlign:"right"}}>
-                        {/* Current value — auto-calculated (read-only) or manually editable */}
-                        {editingId===pos.id
-                          ? <div style={{display:"flex",gap:5,alignItems:"center"}}>
+
+                        {/* ── AUTO: live price × units (read-only) ── */}
+                        {isAuto&&<div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>
+                          €{currentValue.toLocaleString()}<span style={{fontSize:9,color:"#34d399",marginLeft:4}}>live</span>
+                        </div>}
+
+                        {/* ── NO TICKER (fund/cash): manual current value ── */}
+                        {noTicker&&!isAuto&&(editingId===pos.id
+                          ? <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
                               <span style={{fontSize:11,color:C.mut}}>€</span>
                               <input autoFocus type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveValue(pos.id);if(e.key==="Escape")setEditingId(null);}} style={{...inp,width:80,padding:"3px 7px"}}/>
                               <button onClick={()=>saveValue(pos.id)} style={{padding:"3px 8px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
                               <button onClick={()=>setEditingId(null)} style={{padding:"3px 6px",background:"none",border:`1px solid ${C.bdr}`,borderRadius:4,color:C.mut,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
                             </div>
-                          : isAuto
-                            ? <div style={{fontSize:14,fontWeight:700,color:C.text}}>€{currentValue.toLocaleString()}<span style={{fontSize:9,color:"#34d399",marginLeft:4}}>live</span></div>
-                            : <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());setEditingInvestedId(null);}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",fontFamily:"inherit"}}>€{currentValue.toLocaleString()}</button>
-                        }
+                          : <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());setEditingInvestedId(null);}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",fontFamily:"inherit",display:"block",marginBottom:3}}>€{currentValue.toLocaleString()}</button>
+                        )}
 
-                        {/* Invested — always editable */}
-                        <div style={{fontSize:10,marginTop:3,display:"flex",gap:5,justifyContent:"flex-end",alignItems:"center"}}>
+                        {/* ── PAID — editable for all positions ── */}
+                        <div style={{fontSize:10,display:"flex",gap:5,justifyContent:"flex-end",alignItems:"center"}}>
                           {editingInvestedId===pos.id
                             ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
                                 <span style={{color:C.sub}}>paid €</span>
                                 <input autoFocus type="number" value={editInvestedVal} onChange={e=>setEditInvestedVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveInvested(pos.id);if(e.key==="Escape")setEditingInvestedId(null);}} style={{...inp,width:70,padding:"2px 6px",fontSize:11}}/>
                                 <button onClick={()=>saveInvested(pos.id)} style={{padding:"2px 6px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
                               </div>
-                            : <button onClick={()=>{setEditingInvestedId(pos.id);setEditInvestedVal(invested.toString());setEditingId(null);}} style={{fontSize:10,color:C.sub,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,textDecoration:"underline dotted",textUnderlineOffset:2}}>paid €{Math.round(invested).toLocaleString()}</button>
+                            : <button onClick={()=>{setEditingInvestedId(pos.id);setEditInvestedVal(invested.toString());setEditingId(null);}} style={{fontSize:isAuto||noTicker?10:14,color:isAuto||noTicker?C.sub:C.text,fontWeight:isAuto||noTicker?400:700,background:"none",border:isAuto||noTicker?"none":`1px solid ${C.bdr}`,borderRadius:6,padding:isAuto||noTicker?0:"3px 9px",cursor:"pointer",fontFamily:"inherit",textDecoration:isAuto||noTicker?"underline dotted":"none",textUnderlineOffset:2}}>
+                                {isAuto||noTicker?"paid ":""}€{Math.round(invested).toLocaleString()}
+                              </button>
                           }
                           {pnl!==0&&<span style={{color:pnl>=0?"#34d399":"#f87171"}}>{pnl>=0?"+":""}{Math.round(pnl)}€ ({pnlPct.toFixed(1)}%)</span>}
                         </div>

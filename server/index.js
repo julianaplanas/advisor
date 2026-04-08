@@ -216,6 +216,58 @@ app.post("/api/prices", requireAuth, async (req, res) => {
   res.json({ prices });
 });
 
+// ─── HISTORICAL PRICE ─────────────────────────────────────────────────────────
+app.post("/api/price-at-date", requireAuth, async (req, res) => {
+  const { ticker, date } = req.body; // date: "YYYY-MM-DD"
+  if (!ticker || !date) return res.status(400).json({ error: "Missing ticker or date" });
+
+  const dateObj = new Date(date + "T12:00:00Z");
+  const period1 = Math.floor(dateObj.getTime() / 1000);
+  const period2 = period1 + 7 * 86400; // +7 days to handle weekends/holidays
+
+  const cryptoId = CRYPTO_IDS[ticker.replace(/-EUR$/, "")];
+
+  try {
+    if (cryptoId) {
+      // CoinGecko historical — crypto trades every day
+      const d = dateObj.getUTCDate(), m = dateObj.getUTCMonth() + 1, y = dateObj.getUTCFullYear();
+      const cgDate = `${String(d).padStart(2,"0")}-${String(m).padStart(2,"0")}-${y}`;
+      const r = await fetch(`https://api.coingecko.com/api/v3/coins/${cryptoId}/history?date=${cgDate}&localization=false`, {
+        headers: { Accept: "application/json" },
+      });
+      const data = await r.json();
+      const priceEur = data?.market_data?.current_price?.eur;
+      if (!priceEur) return res.status(404).json({ error: "No price found for that date" });
+      return res.json({ priceEur });
+    }
+
+    // Yahoo Finance historical chart
+    let eurUsd = 1.1;
+    try { const fx = await yfFetch("EURUSD=X"); if (fx) eurUsd = fx.price; } catch {}
+
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&period1=${period1}&period2=${period2}`;
+    const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
+    if (!r.ok) return res.status(404).json({ error: "Yahoo Finance fetch failed" });
+    const d = await r.json();
+
+    const result = d?.chart?.result?.[0];
+    const closes = result?.indicators?.quote?.[0]?.close;
+    const currency = result?.meta?.currency;
+    const price = closes?.find(c => c != null);
+    if (!price) return res.status(404).json({ error: "No price data for that date" });
+
+    const priceEur = currency === "EUR" ? price
+      : currency === "USD" ? price / eurUsd
+      : currency === "GBp" ? (price / 100) * (1 / eurUsd) * 0.87
+      : price;
+
+    res.json({ priceEur });
+  } catch (e) {
+    console.error("price-at-date error:", e);
+    res.status(500).json({ error: "Price lookup failed" });
+  }
+});
+
 // ─── STATIC CLIENT ────────────────────────────────────────────────────────────
 const clientDist = path.join(__dirname, "../client/dist");
 if (fs.existsSync(clientDist)) {
