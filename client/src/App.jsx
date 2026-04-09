@@ -394,7 +394,19 @@ export default function App() {
 
   useEffect(() => {
     if (!authed) return;
-    api.storageGet("portfolio-positions").then(r=>{const v=JSON.parse(r.value);if(Array.isArray(v)&&v.length>0)setPositions(v);}).catch(()=>{});
+    api.storageGet("portfolio-positions").then(r=>{
+      const v=JSON.parse(r.value);
+      if(Array.isArray(v)&&v.length>0) {
+        // Backfill ticker from ASSET_LOOKUP for positions saved before tickers were tracked
+        const fixed = v.map(p => {
+          if (p.ticker) return p;
+          const key = p.name?.trim().toUpperCase().split(' ')[0]; // e.g. "NVDA", "SXR8", "ETH"
+          const match = ASSET_LOOKUP[key] || ASSET_LOOKUP[p.name?.trim().toUpperCase()];
+          return match ? { ...p, ticker: match.ticker } : p;
+        });
+        setPositions(fixed);
+      }
+    }).catch(()=>{});
     api.storageGet("chat-history").then(r=>{const v=JSON.parse(r.value);if(Array.isArray(v)&&v.length>0)setChatMessages(v);}).catch(()=>{});
   }, [authed]);
 
@@ -479,7 +491,10 @@ export default function App() {
     setPricesLoading(true);
     try {
       const tickers = {};
-      positions.forEach(p => { if (p.ticker) tickers[p.id] = p.ticker; });
+      positions.forEach(p => {
+        const t = p.ticker || ASSET_LOOKUP[p.name?.trim().toUpperCase().split(' ')[0]]?.ticker;
+        if (t) tickers[p.id] = t;
+      });
       console.log("[prices] fetching tickers:", tickers);
       const result = await api.prices(tickers);
       const prices = result.prices || {};
