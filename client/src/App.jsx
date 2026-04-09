@@ -400,6 +400,13 @@ export default function App() {
 
   useEffect(() => { if(!authed)return; api.storageSet("portfolio-positions",JSON.stringify(positions)).catch(()=>{}); }, [positions, authed]);
   useEffect(() => { if(!authed)return; api.storageSet("chat-history",JSON.stringify(chatMessages)).catch(()=>{}); }, [chatMessages, authed]);
+
+  // Auto-refresh prices when a position with units has no price data yet
+  useEffect(() => {
+    if (!authed || pricesLoading) return;
+    const needsPrice = positions.some(p => p.units > 0 && p.ticker && !priceData[p.id]);
+    if (needsPrice) refreshPrices();
+  }, [positions, authed]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({behavior:"smooth"}); }, [chatMessages, chatLoading]);
 
   function saveValue(id){const num=parseFloat(editVal);if(!isNaN(num)&&num>=0){setPositions(ps=>ps.map(p=>p.id===id?{...p,value:num}:p));flash();}setEditingId(null);}
@@ -464,8 +471,6 @@ export default function App() {
     setShowAddForm(false);
     setShowAdvancedAdd(false);
     flash();
-    // Auto-fetch live prices so current value shows immediately
-    if (ticker) setTimeout(() => refreshPrices(), 100);
   }
   function flash(){setSavedFlash(true);setTimeout(()=>setSavedFlash(false),1800);}
   function clearChat(){if(!window.confirm("Clear the entire conversation history? This cannot be undone."))return;setChatMessages([]);}
@@ -475,14 +480,18 @@ export default function App() {
     try {
       const tickers = {};
       positions.forEach(p => { if (p.ticker) tickers[p.id] = p.ticker; });
+      console.log("[prices] fetching tickers:", tickers);
       const result = await api.prices(tickers);
       const prices = result.prices || {};
+      console.log("[prices] response:", prices);
+      positions.forEach(p => console.log(`[prices] ${p.name}: units=${p.units}, priceData=`, prices[p.id]));
       setPriceData(prices);
-      // Auto-update position values for entries where units are set
       setPositions(ps => ps.map(p => {
         const lp = prices[p.id];
         if (lp && p.units != null && p.units > 0) {
-          return { ...p, value: Math.round(p.units * lp.priceEur * 100) / 100 };
+          const newVal = Math.round(p.units * lp.priceEur * 100) / 100;
+          console.log(`[prices] updating ${p.name}: ${p.units} units × €${lp.priceEur.toFixed(2)} = €${newVal}`);
+          return { ...p, value: newVal };
         }
         return p;
       }));
