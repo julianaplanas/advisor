@@ -495,18 +495,13 @@ export default function App() {
         const t = p.ticker || ASSET_LOOKUP[p.name?.trim().toUpperCase().split(' ')[0]]?.ticker;
         if (t) tickers[p.id] = t;
       });
-      console.log("[prices] fetching tickers:", tickers);
       const result = await api.prices(tickers);
       const prices = result.prices || {};
-      console.log("[prices] response:", prices);
-      positions.forEach(p => console.log(`[prices] ${p.name}: units=${p.units}, priceData=`, prices[p.id]));
       setPriceData(prices);
       setPositions(ps => ps.map(p => {
         const lp = prices[p.id];
         if (lp && p.units != null && p.units > 0) {
-          const newVal = Math.round(p.units * lp.priceEur * 100) / 100;
-          console.log(`[prices] updating ${p.name}: ${p.units} units × €${lp.priceEur.toFixed(2)} = €${newVal}`);
-          return { ...p, value: newVal };
+          return { ...p, value: Math.round(p.units * lp.priceEur * 100) / 100 };
         }
         return p;
       }));

@@ -156,6 +156,42 @@ async function yfFetch(symbol) {
   return { price: meta.regularMarketPrice, currency: meta.currency, change24h: ((meta.regularMarketPrice - prev) / prev) * 100 };
 }
 
+// stooq suffix → currency
+const STOOQ_CURRENCY = { DE: "EUR", F: "EUR", BE: "EUR", V: "EUR", UK: "GBp", US: "USD" };
+
+// Exchange suffix translations to try on stooq when Yahoo fails
+const STOOQ_FALLBACKS = { MI: ["DE", "UK"], AS: ["DE", "UK"], L: ["UK"] };
+
+async function stooqFetch(symbol) {
+  const [base, exchange] = symbol.split(".");
+  const suffixesToTry = exchange ? (STOOQ_FALLBACKS[exchange] || [exchange]) : ["DE", "UK", "US"];
+  for (const suffix of suffixesToTry) {
+    const stooqSym = `${base}.${suffix}`;
+    try {
+      const r = await fetch(`https://stooq.com/q/l/?s=${encodeURIComponent(stooqSym)}&f=sd2t2ohlcv&h&e=csv`, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+      });
+      if (!r.ok) continue;
+      const text = await r.text();
+      const row = text.split("\n")[1]?.split(",");
+      if (!row || row[6] === "N/D" || !row[6]) continue;
+      const close = parseFloat(row[6]);
+      const open = parseFloat(row[3]) || close;
+      if (isNaN(close)) continue;
+      const currency = STOOQ_CURRENCY[suffix] || "USD";
+      const change24h = open ? ((close - open) / open) * 100 : 0;
+      return { price: close, currency, change24h };
+    } catch { continue; }
+  }
+  return null;
+}
+
+async function fetchPrice(symbol) {
+  const yf = await yfFetch(symbol).catch(() => null);
+  if (yf) return yf;
+  return stooqFetch(symbol).catch(() => null);
+}
+
 app.post("/api/prices", requireAuth, async (req, res) => {
   const { tickers } = req.body; // { [posId]: "NVDA" }
   if (!tickers || typeof tickers !== "object") return res.json({ prices: {} });
@@ -196,9 +232,9 @@ app.post("/api/prices", requireAuth, async (req, res) => {
     try { const fx = await yfFetch("EURUSD=X"); if (fx) eurUsd = fx.price; } catch {}
   }
 
-  // Stocks/ETFs via Yahoo Finance (parallel)
+  // Stocks/ETFs via Yahoo Finance with stooq fallback (parallel)
   await Promise.all(stockSymbols.map(async sym => {
-    const q = await yfFetch(sym).catch(() => null);
+    const q = await fetchPrice(sym);
     if (!q) return;
     const priceEur = q.currency === "EUR" ? q.price
       : q.currency === "USD" ? q.price / eurUsd
@@ -241,25 +277,48 @@ app.post("/api/price-at-date", requireAuth, async (req, res) => {
       return res.json({ priceEur });
     }
 
-    // Yahoo Finance historical chart
+    // Yahoo Finance historical chart (no stooq fallback for historical — stooq historical is unreliable)
     let eurUsd = 1.1;
     try { const fx = await yfFetch("EURUSD=X"); if (fx) eurUsd = fx.price; } catch {}
 
+    // Try the given ticker first, then stooq exchange variants
+    let price = null, currency = null;
+
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&period1=${period1}&period2=${period2}`;
     const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
-    if (!r.ok) return res.status(404).json({ error: "Yahoo Finance fetch failed" });
-    const d = await r.json();
+    if (r.ok) {
+      const d = await r.json();
+      const result = d?.chart?.result?.[0];
+      price = result?.indicators?.quote?.[0]?.close?.find(c => c != null) ?? null;
+      currency = result?.meta?.currency ?? null;
+    }
 
-    const result = d?.chart?.result?.[0];
-    const closes = result?.indicators?.quote?.[0]?.close;
-    const currency = result?.meta?.currency;
-    const price = closes?.find(c => c != null);
+    // Fallback: try alternative exchange suffixes on Yahoo
+    if (!price) {
+      const [base, exchange] = ticker.split(".");
+      const alts = STOOQ_FALLBACKS[exchange] || [];
+      for (const alt of alts) {
+        const altTicker = `${base}.${alt === "UK" ? "L" : alt}`; // stooq .UK = Yahoo .L
+        const altUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(altTicker)}?interval=1d&period1=${period1}&period2=${period2}`;
+        try {
+          const ar = await fetch(altUrl, { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } });
+          if (!ar.ok) continue;
+          const ad = await ar.json();
+          const aresult = ad?.chart?.result?.[0];
+          const ap = aresult?.indicators?.quote?.[0]?.close?.find(c => c != null);
+          if (ap) { price = ap; currency = aresult?.meta?.currency; break; }
+        } catch { continue; }
+      }
+    }
+
     if (!price) return res.status(404).json({ error: "No price data for that date" });
 
+    const gbpEur = 1 / eurUsd * 0.87;
     const priceEur = currency === "EUR" ? price
       : currency === "USD" ? price / eurUsd
-      : currency === "GBp" ? (price / 100) * (1 / eurUsd) * 0.87
-      : price;
+      : currency === "GBp" ? (price / 100) * gbpEur
+      : currency === "GBP" ? price * gbpEur
+      : price / eurUsd; // assume USD as last resort
 
     res.json({ priceEur });
   } catch (e) {
