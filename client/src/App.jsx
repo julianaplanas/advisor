@@ -455,7 +455,10 @@ export default function App() {
     let units = null;
 
     const ticker = newPos.ticker || null;
-    if (ticker && newPos.purchaseDate) {
+    const directUnits = parseFloat(newPos.units);
+    if (directUnits > 0) {
+      units = directUnits;
+    } else if (ticker && newPos.purchaseDate) {
       setAddingPos(true);
       try {
         const { priceEur } = await api.priceAtDate(ticker, newPos.purchaseDate);
@@ -780,42 +783,59 @@ Rules:
               </div>
 
               {/* Primary fields */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER / NAME</div>
-                  <input autoFocus style={{...inp,borderColor:match?"#134e2a":C.bdr}} placeholder="e.g. NVDA, BTC, SXR8" value={newPos.name}
-                    onChange={e=>{
-                      const raw=e.target.value;
-                      const m=ASSET_LOOKUP[raw.trim().toUpperCase()];
-                      if(m) setNewPos(p=>({...p,name:m.name,ticker:m.ticker||"",type:m.type,region:m.region,platform:m.platform,annualFee:m.annualFee}));
-                      else setNewPos(p=>({...p,name:raw}));
-                    }}/>
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:C.mut,marginBottom:4}}>AMOUNT INVESTED (€)</div>
-                  <input style={inp} type="number" placeholder="e.g. 500" value={newPos.invested} onChange={e=>setNewPos(p=>({...p,invested:e.target.value}))}/>
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:C.mut,marginBottom:4}}>DATE OF PURCHASE</div>
-                  <input style={inp} type="date" value={newPos.purchaseDate} onChange={e=>setNewPos(p=>({...p,purchaseDate:e.target.value}))}/>
-                  {newPos.ticker&&newPos.purchaseDate
-                    ? <div style={{fontSize:9,color:"#34d399",marginTop:3}}>✓ units will be calculated automatically</div>
-                    : <div style={{fontSize:9,color:C.sub,marginTop:3}}>Enter to calculate units from historical price</div>}
-                </div>
-              </div>
+              {(()=>{
+                const isCrypto = (match?.type||newPos.type)==="crypto";
+                const coinLabel = newPos.name?.trim().toUpperCase().split(" ")[0] || "coins";
+                const hasDirectUnits = parseFloat(newPos.units) > 0;
+                return <>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                    <div>
+                      <div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER / NAME</div>
+                      <input autoFocus style={{...inp,borderColor:match?"#134e2a":C.bdr}} placeholder="e.g. NVDA, BTC, SXR8" value={newPos.name}
+                        onChange={e=>{
+                          const raw=e.target.value;
+                          const m=ASSET_LOOKUP[raw.trim().toUpperCase()];
+                          if(m) setNewPos(p=>({...p,name:m.name,ticker:m.ticker||"",type:m.type,region:m.region,platform:m.platform,annualFee:m.annualFee}));
+                          else setNewPos(p=>({...p,name:raw}));
+                        }}/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,color:C.mut,marginBottom:4}}>PLATFORM</div>
+                      <select style={{...inp,cursor:"pointer"}} value={newPos.platform} onChange={e=>setNewPos(p=>({...p,platform:e.target.value}))}>
+                        {[...Object.keys(PLATFORM_COLORS),"Other"].map(pl=><option key={pl}>{pl}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,color:C.mut,marginBottom:4}}>AMOUNT INVESTED (€)</div>
+                      <input style={inp} type="number" placeholder="e.g. 500" value={newPos.invested} onChange={e=>setNewPos(p=>({...p,invested:e.target.value}))}/>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,color:C.mut,marginBottom:4}}>{isCrypto?`${coinLabel} OWNED`:"SHARES OWNED"}</div>
+                      <input style={{...inp,borderColor:hasDirectUnits?"#134e2a":C.bdr}} type="number" placeholder={isCrypto?"e.g. 0.5":"e.g. 3.2"} step="any" value={newPos.units||""} onChange={e=>setNewPos(p=>({...p,units:e.target.value}))}/>
+                      <div style={{fontSize:9,color:hasDirectUnits?"#34d399":C.sub,marginTop:3}}>
+                        {hasDirectUnits?"✓ will use live price to track value":"from Binance / broker — skips date lookup"}
+                      </div>
+                    </div>
+                    <div style={{gridColumn:"span 2"}}>
+                      <div style={{fontSize:10,color:C.mut,marginBottom:4}}>DATE OF PURCHASE {hasDirectUnits&&<span style={{color:C.sub,fontWeight:400}}>(optional — for record only)</span>}</div>
+                      <input style={inp} type="date" value={newPos.purchaseDate} onChange={e=>setNewPos(p=>({...p,purchaseDate:e.target.value}))}/>
+                      {!hasDirectUnits&&newPos.ticker&&newPos.purchaseDate&&<div style={{fontSize:9,color:"#34d399",marginTop:3}}>✓ {isCrypto?"coins":"shares"} will be calculated from price on that date</div>}
+                      {!hasDirectUnits&&(!newPos.ticker||!newPos.purchaseDate)&&<div style={{fontSize:9,color:C.sub,marginTop:3}}>or enter {isCrypto?"coins":"shares"} owned above to skip this</div>}
+                    </div>
+                  </div>
+                </>;
+              })()}
 
               {/* Customize toggle — only for new positions */}
               {!existingPos&&<>
                 <button onClick={()=>setShowAdvancedAdd(v=>!v)} style={{fontSize:11,color:C.sub,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginBottom:showAdvancedAdd?10:14}}>
-                  {showAdvancedAdd?"▾ hide details":"▸ customize platform, region, fees"}
+                  {showAdvancedAdd?"▾ hide details":"▸ customize type, region, fees"}
                 </button>
-                {showAdvancedAdd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginBottom:10,paddingTop:8,borderTop:`1px solid ${C.bdr}`}}>
-                  <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>PLATFORM</div><select style={{...inp,cursor:"pointer"}} value={newPos.platform} onChange={e=>setNewPos(p=>({...p,platform:e.target.value}))}>{[...Object.keys(PLATFORM_COLORS),"Other"].map(pl=><option key={pl}>{pl}</option>)}</select></div>
+                {showAdvancedAdd&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10,paddingTop:8,borderTop:`1px solid ${C.bdr}`}}>
                   <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TYPE</div><select style={{...inp,cursor:"pointer"}} value={newPos.type} onChange={e=>setNewPos(p=>({...p,type:e.target.value}))}>{["stock","etf","crypto","fund","cash"].map(t=><option key={t}>{t}</option>)}</select></div>
                   <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>REGION</div><select style={{...inp,cursor:"pointer"}} value={newPos.region} onChange={e=>setNewPos(p=>({...p,region:e.target.value}))}>{["US","EU","EM","Crypto","Global"].map(r=><option key={r}>{r}</option>)}</select></div>
                   <div><div style={{fontSize:10,color:C.mut,marginBottom:4}}>ANNUAL FEE %</div><input style={inp} type="number" placeholder="0" step="0.01" value={newPos.annualFee} onChange={e=>setNewPos(p=>({...p,annualFee:e.target.value}))}/></div>
-                  <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER (for price fetch)</div><input style={inp} placeholder="e.g. AAPL, BTC, SXR8.DE" value={newPos.ticker||""} onChange={e=>setNewPos(p=>({...p,ticker:e.target.value}))}/></div>
-                  <div style={{gridColumn:"span 2"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>DISPLAY NAME (override)</div><input style={inp} placeholder={newPos.name||"optional"} value={newPos.name} onChange={e=>setNewPos(p=>({...p,name:e.target.value}))}/></div>
+                  <div style={{gridColumn:"span 3"}}><div style={{fontSize:10,color:C.mut,marginBottom:4}}>TICKER (for price fetch)</div><input style={inp} placeholder="e.g. AAPL, BTC, SXR8.DE" value={newPos.ticker||""} onChange={e=>setNewPos(p=>({...p,ticker:e.target.value}))}/></div>
                 </div>}
               </>}
 
@@ -854,8 +874,11 @@ Rules:
                   <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}
+                        {pos.units>0&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>
+                          {pos.units<0.01?pos.units.toFixed(6):pos.units<1?pos.units.toFixed(4):pos.units<100?parseFloat(pos.units.toFixed(4)):Math.round(pos.units)} {pos.name.trim().toUpperCase().split(" ")[0]}
+                        </span>}
                         {pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.lots.length} purchases{hasPartialLots&&<span style={{color:"#f59e0b"}}> · partial tracking</span>}</span>}
-                        {pos.lots?.length===1&&pos.lots[0].date&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>since {pos.lots[0].date}</span>}
+                        {(!pos.units||pos.units<=0)&&pos.lots?.length===1&&pos.lots[0].date&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>since {pos.lots[0].date}</span>}
                       </div>
                       <div style={{fontSize:10,color:C.sub,marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                         <span style={{color:TYPE_COLORS[pos.type]||C.sub}}>{pos.type}</span>
