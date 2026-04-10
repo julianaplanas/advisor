@@ -130,8 +130,10 @@ function groupBy(positions, key) {
   return g;
 }
 
-function buildContext(positions) {
+function buildContext(positions, profile = {}) {
   const total = positions.reduce((s, p) => s + p.value, 0);
+  const totalInvested = positions.reduce((s, p) => s + (p.invested ?? p.value), 0);
+  const totalPnl = total - totalInvested;
   const byPlat = {};
   positions.forEach(p => {
     if (!byPlat[p.platform]) byPlat[p.platform] = [];
@@ -139,17 +141,33 @@ function buildContext(positions) {
   });
   const lines = Object.entries(byPlat).map(([plat, pos]) => {
     const t = pos.reduce((s, p) => s + p.value, 0);
-    return `- ${plat}: ${pos.map(p=>`${p.name} €${Math.round(p.value)}`).join(", ")}. Subtotal €${Math.round(t)}`;
+    const posLines = pos.map(p => {
+      const invested = p.invested ?? p.value;
+      const pnl = p.value - invested;
+      const pnlPct = invested > 0 ? (pnl / invested * 100).toFixed(1) : "0";
+      const pnlStr = pnl !== 0 ? ` (P&L: ${pnl >= 0 ? "+" : ""}€${Math.round(pnl)}, ${pnl >= 0 ? "+" : ""}${pnlPct}%)` : "";
+      const feeStr = p.annualFee > 0 ? ` TER:${p.annualFee}%` : "";
+      const lotsStr = p.lots?.length > 1 ? ` ${p.lots.length} purchases` : p.lots?.[0]?.date ? ` since ${p.lots[0].date}` : "";
+      return `  • ${p.name} [${p.type}/${p.region}]: €${Math.round(p.value)}${pnlStr}${feeStr}${lotsStr}`;
+    });
+    return `${plat} (€${Math.round(t)}):\n${posLines.join("\n")}`;
   });
-  return `${lines.join("\n")}
-- TOTAL: €${Math.round(total)}
+  return `${lines.join("\n\n")}
+
+TOTAL: €${Math.round(total)} | Invested: €${Math.round(totalInvested)} | Overall P&L: ${totalPnl >= 0 ? "+" : ""}€${Math.round(totalPnl)} (${(totalPnl / totalInvested * 100).toFixed(1)}%)
 
 Income & currency context:
 - Income in TWO currencies: Argentine Pesos (ARS) and Euros (EUR). Strategy differs per currency.
 - ARS: capital controls + inflation → exit pesos fast. Method: Binance P2P (buy BTC/ETH/USDT). Alternatives: MEP dollar, CCL, Cedears.
 - EUR: standard long-term investing → ETFs (eToro/BBVA), funds, direct positions.
 - Factor in which currency new money is coming from when advising.
-- Tax exposure in Spain and Argentina. Comfortable locking money long-term. Wants bold but not reckless growth.`;
+- Tax exposure in Spain and Argentina. Comfortable locking money long-term. Wants bold but not reckless growth.
+
+User profile:
+- Residence: ${profile.residence||"Spain"}
+- Taxes paid in: ${profile.taxCountry||"Spain"}
+- Employment: ${profile.employment||"Autónoma in Spain"}${profile.extra?`\n- ${profile.extra}`:""}`;
+
 }
 
 // ─── MARKDOWN ─────────────────────────────────────────────────────────────────
@@ -388,6 +406,8 @@ export default function App() {
   const [extracting, setExtracting]       = useState(false);
   const [priceData, setPriceData]         = useState({});
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [profile, setProfile]             = useState({ residence:"Spain", taxCountry:"Spain", employment:"Autónoma in Spain", extra:"" });
+  const [editingProfile, setEditingProfile] = useState(false);
   const chatEndRef = useRef(null);
 
   useEffect(() => { api.me().then(()=>setAuthed(true)).catch(()=>setAuthed(false)); window.addEventListener("auth:logout",()=>setAuthed(false)); }, []);
@@ -408,10 +428,12 @@ export default function App() {
       }
     }).catch(()=>{});
     api.storageGet("chat-history").then(r=>{const v=JSON.parse(r.value);if(Array.isArray(v)&&v.length>0)setChatMessages(v);}).catch(()=>{});
+    api.storageGet("user-profile").then(r=>{const v=JSON.parse(r.value);if(v&&typeof v==="object")setProfile(v);}).catch(()=>{});
   }, [authed]);
 
   useEffect(() => { if(!authed)return; api.storageSet("portfolio-positions",JSON.stringify(positions)).catch(()=>{}); }, [positions, authed]);
   useEffect(() => { if(!authed)return; api.storageSet("chat-history",JSON.stringify(chatMessages)).catch(()=>{}); }, [chatMessages, authed]);
+  useEffect(() => { if(!authed)return; api.storageSet("user-profile",JSON.stringify(profile)).catch(()=>{}); }, [profile, authed]);
 
   // Auto-refresh prices when a position with units has no price data yet
   useEffect(() => {
@@ -419,6 +441,7 @@ export default function App() {
     const needsPrice = positions.some(p => p.units > 0 && p.ticker && !priceData[p.id]);
     if (needsPrice) refreshPrices();
   }, [positions, authed]);
+
   useEffect(() => { chatEndRef.current?.scrollIntoView({behavior:"smooth"}); }, [chatMessages, chatLoading]);
 
   function saveValue(id){const num=parseFloat(editVal);if(!isNaN(num)&&num>=0){setPositions(ps=>ps.map(p=>p.id===id?{...p,value:num}:p));flash();}setEditingId(null);}
@@ -509,7 +532,7 @@ export default function App() {
     setPricesLoading(false);
   }
 
-  const portfolioContext = buildContext(positions);
+  const portfolioContext = buildContext(positions, profile);
 
   async function aiChat(userMessage, currentHistory) {
     const msgs = [...currentHistory, {role:"user", content:userMessage}];
@@ -691,6 +714,32 @@ Rules:
                 ))}
                 <div style={{fontSize:11,color:C.sub,paddingTop:2}}>ETF/fund annual fees (TER) are shown per position in the Portfolio tab. These are separate from transaction costs.</div>
               </div>
+
+              {/* Profile card */}
+              <div style={card}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:editingProfile?12:8}}>
+                  <div style={lbl}>Your Profile</div>
+                  <button onClick={()=>setEditingProfile(v=>!v)} style={{fontSize:11,color:C.acc,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>{editingProfile?"done":"edit"}</button>
+                </div>
+                {editingProfile
+                  ? <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      {[["residence","Residence"],["taxCountry","Taxes paid in"],["employment","Employment"],["extra","Additional context"]].map(([field,label])=>(
+                        <div key={field}>
+                          <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{label.toUpperCase()}</div>
+                          <input style={inp} value={profile[field]||""} onChange={e=>setProfile(p=>({...p,[field]:e.target.value}))} placeholder={field==="extra"?"e.g. married, 2 kids, retiring in 20 years…":""}/>
+                        </div>
+                      ))}
+                    </div>
+                  : <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                      {[["Residence",profile.residence],["Taxes",profile.taxCountry],["Employment",profile.employment],profile.extra&&["Context",profile.extra]].filter(Boolean).map(([label,val])=>(
+                        <div key={label} style={{display:"flex",gap:8,fontSize:12}}>
+                          <span style={{color:C.sub,minWidth:80}}>{label}</span>
+                          <span style={{color:C.text}}>{val}</span>
+                        </div>
+                      ))}
+                    </div>
+                }
+              </div>
             </div>
           </div>
         </>}
@@ -812,6 +861,8 @@ Rules:
                         <span>· {pos.region}</span>
                         {pos.annualFee>0&&<span style={{color:"#f59e0b",background:"#1a150a",border:"1px solid #3d2e0a",borderRadius:3,padding:"0 4px"}}>{pos.annualFee}% p.a.</span>}
                         {lp&&<span style={{color:lp.change24h>=0?"#34d399":"#f87171",background:lp.change24h>=0?"#0a1f14":"#1f0a0a",border:`1px solid ${lp.change24h>=0?"#134e2a":"#4e1313"}`,borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>€{lp.priceEur<10?lp.priceEur.toFixed(4):lp.priceEur<100?lp.priceEur.toFixed(2):Math.round(lp.priceEur).toLocaleString()}/unit {lp.change24h>=0?"+":""}{lp.change24h.toFixed(1)}%</span>}
+                        {noTicker&&pos.type==="fund"&&<span style={{color:C.sub,fontSize:10,fontStyle:"italic"}}>BBVA → Valor total de la inversión</span>}
+                        {noTicker&&pos.type==="cash"&&<span style={{color:C.sub,fontSize:10,fontStyle:"italic"}}>manual</span>}
                       </div>
                     </div>
 
@@ -825,25 +876,30 @@ Rules:
 
                         {/* ── NO TICKER (fund/cash): manual current value ── */}
                         {noTicker&&!isAuto&&(editingId===pos.id
-                          ? <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:3}}>
-                              <span style={{fontSize:11,color:C.mut}}>€</span>
-                              <input autoFocus type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveValue(pos.id);if(e.key==="Escape")setEditingId(null);}} style={{...inp,width:80,padding:"3px 7px"}}/>
-                              <button onClick={()=>saveValue(pos.id)} style={{padding:"3px 8px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                              <button onClick={()=>setEditingId(null)} style={{padding:"3px 6px",background:"none",border:`1px solid ${C.bdr}`,borderRadius:4,color:C.mut,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                          ? <div style={{marginBottom:3}}>
+                              {pos.type==="fund"&&<div style={{fontSize:9,color:"#22d3ee",marginBottom:4}}>BBVA app → "{pos.name}" → Valor total de la inversión</div>}
+                              <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                <span style={{fontSize:11,color:C.mut}}>€</span>
+                                <input autoFocus type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveValue(pos.id);if(e.key==="Escape")setEditingId(null);}} style={{...inp,width:90,padding:"3px 7px"}}/>
+                                <button onClick={()=>saveValue(pos.id)} style={{padding:"3px 8px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
+                                <button onClick={()=>setEditingId(null)} style={{padding:"3px 6px",background:"none",border:`1px solid ${C.bdr}`,borderRadius:4,color:C.mut,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
+                              </div>
                             </div>
-                          : <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());setEditingInvestedId(null);}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",fontFamily:"inherit",display:"block",marginBottom:3}}>€{currentValue.toLocaleString()}</button>
+                          : <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());setEditingInvestedId(null);}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${pos.type==="fund"?"#1e3a5f":C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",fontFamily:"inherit",display:"block",marginBottom:3}}>
+                              €{currentValue.toLocaleString()}{pos.type==="fund"&&<span style={{fontSize:10,color:C.mut,fontWeight:400,marginLeft:5}}>✎</span>}
+                            </button>
                         )}
 
                         {/* ── PAID — editable for all positions ── */}
                         <div style={{fontSize:10,display:"flex",gap:5,justifyContent:"flex-end",alignItems:"center"}}>
                           {editingInvestedId===pos.id
                             ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                <span style={{color:C.sub}}>paid €</span>
+                                <span style={{color:C.sub}}>{pos.type==="fund"?"aportaciones €":"paid €"}</span>
                                 <input autoFocus type="number" value={editInvestedVal} onChange={e=>setEditInvestedVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveInvested(pos.id);if(e.key==="Escape")setEditingInvestedId(null);}} style={{...inp,width:70,padding:"2px 6px",fontSize:11}}/>
                                 <button onClick={()=>saveInvested(pos.id)} style={{padding:"2px 6px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
                               </div>
                             : <button onClick={()=>{setEditingInvestedId(pos.id);setEditInvestedVal(invested.toString());setEditingId(null);}} style={{fontSize:isAuto||noTicker?10:14,color:isAuto||noTicker?C.sub:C.text,fontWeight:isAuto||noTicker?400:700,background:"none",border:isAuto||noTicker?"none":`1px solid ${C.bdr}`,borderRadius:6,padding:isAuto||noTicker?0:"3px 9px",cursor:"pointer",fontFamily:"inherit",textDecoration:isAuto||noTicker?"underline dotted":"none",textUnderlineOffset:2}}>
-                                {isAuto||noTicker?"paid ":""}€{Math.round(invested).toLocaleString()}
+                                {pos.type==="fund"?"aportaciones ":isAuto||noTicker?"paid ":""}€{Math.round(invested).toLocaleString()}
                               </button>
                           }
                           {pnl!==0&&<span style={{color:pnl>=0?"#34d399":"#f87171"}}>{pnl>=0?"+":""}{Math.round(pnl)}€ ({pnlPct.toFixed(1)}%)</span>}
@@ -857,7 +913,6 @@ Rules:
             </div>;
           })}
           </div>
-          <button onClick={()=>{if(window.confirm("Reset to defaults?"))setPositions(DEFAULT_PORTFOLIO);}} style={{width:"100%",padding:"10px",borderRadius:8,border:"1px solid #3d1515",background:"none",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:"inherit",marginTop:14}}>Reset to defaults</button>
         </>}
 
         {tab==="research"&&<>
