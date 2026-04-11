@@ -71,6 +71,7 @@ const ASSET_LOOKUP = {
   V:     { name:"V",     ticker:"V",       type:"stock", region:"US",     platform:"eToro",      annualFee:0 },
   MA:    { name:"MA",    ticker:"MA",      type:"stock", region:"US",     platform:"eToro",      annualFee:0 },
   JPM:   { name:"JPM",   ticker:"JPM",     type:"stock", region:"US",     platform:"eToro",      annualFee:0 },
+  TS:    { name:"TS (Tenaris)", ticker:"TS", type:"stock", region:"EM",   platform:"eToro",      annualFee:0 },
   // EU Stocks
   BAYN:  { name:"BAYN",  ticker:"BAYN.DE", type:"stock", region:"EU",     platform:"eToro",      annualFee:0 },
   SAP:   { name:"SAP",   ticker:"SAP.DE",  type:"stock", region:"EU",     platform:"eToro",      annualFee:0 },
@@ -78,7 +79,7 @@ const ASSET_LOOKUP = {
   // ETFs
   SXR8:  { name:"SXR8 (S&P 500 ETF)",  ticker:"SXR8.DE", type:"etf", region:"US",     platform:"eToro", annualFee:0.07 },
   VWCE:  { name:"VWCE (World ETF)",     ticker:"VWCE.DE", type:"etf", region:"Global", platform:"eToro", annualFee:0.22 },
-  QDVE:  { name:"QDVE (Tech ETF)",      ticker:"QDVE.MI", type:"etf", region:"US",     platform:"eToro", annualFee:0.35 },
+  QDVE:  { name:"QDVE (Tech ETF)",      ticker:"QDVE.DE", type:"etf", region:"US",     platform:"eToro", annualFee:0.35 },
   IDEM:  { name:"IDEM (Italy ETF)",     ticker:"IDEM.MI", type:"etf", region:"EU",     platform:"eToro", annualFee:0.35 },
   VHYD:  { name:"VHYD (Dividend ETF)",  ticker:"VHYD.AS", type:"etf", region:"EU",     platform:"eToro", annualFee:0.29 },
   VGWD:  { name:"VGWD (Dividend ETF)",  ticker:"VHYD.AS", type:"etf", region:"EU",     platform:"eToro", annualFee:0.29 },
