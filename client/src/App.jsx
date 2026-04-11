@@ -910,10 +910,22 @@ Rules:
 
                       {/* ── Expanded edit panel ── */}
                       {isEditing&&<div style={{marginTop:8,padding:10,background:"#0d1826",border:`1px solid #1e3a5f`,borderRadius:8}}>
+                        {/* Hint per platform */}
+                        {pos.platform==="eToro"&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                          <span style={{fontSize:9,color:C.acc}}>eToro → Invertido: put Unidades + avg price ($)</span>
+                          {editLots.length>1&&<button onClick={()=>{
+                            const totalInv = editLots.reduce((s,l)=>s+parseFloat(l.invested||0),0);
+                            const totalU = editLots.reduce((s,l)=>s+(parseFloat(l.units)||0),0);
+                            setEditLots([{invested:totalInv.toString(),units:totalU?totalU.toString():"",date:""}]);
+                          }} style={{fontSize:10,color:"#f59e0b",background:"none",border:`1px solid #3d2e0a`,borderRadius:4,padding:"2px 8px",cursor:"pointer",fontFamily:"inherit"}}>merge into 1</button>}
+                        </div>}
+                        {pos.platform==="Binance"&&<div style={{fontSize:9,color:C.acc,marginBottom:8}}>Binance → Spot wallet → coin amount + cost basis</div>}
+                        {pos.type==="fund"&&<div style={{fontSize:9,color:C.acc,marginBottom:8}}>BBVA → Aportaciones + Valor total de la inversión</div>}
+
                         {/* Per-lot editing */}
                         {editLots.map((lot,li)=>(
-                          <div key={li} style={{display:"grid",gridTemplateColumns:noTicker?"1fr 1fr":"1fr 1fr 1fr",gap:8,marginBottom:editLots.length>1?6:8,paddingBottom:editLots.length>1&&li<editLots.length-1?6:0,borderBottom:editLots.length>1&&li<editLots.length-1?`1px solid ${C.bdr}`:"none"}}>
-                            {editLots.length>1&&<div style={{gridColumn:noTicker?"span 2":"span 3",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div key={li} style={{display:"grid",gridTemplateColumns:noTicker?"1fr 1fr":pos.platform==="eToro"?"1fr 1fr 1fr 1fr":"1fr 1fr 1fr",gap:8,marginBottom:editLots.length>1?6:8,paddingBottom:editLots.length>1&&li<editLots.length-1?6:0,borderBottom:editLots.length>1&&li<editLots.length-1?`1px solid ${C.bdr}`:"none"}}>
+                            {editLots.length>1&&<div style={{gridColumn:noTicker?"span 2":pos.platform==="eToro"?"span 4":"span 3",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                               <span style={{fontSize:10,color:C.acc,fontWeight:700}}>Purchase {li+1}</span>
                               <button onClick={()=>setEditLots(ls=>ls.filter((_,i)=>i!==li))} style={{fontSize:11,color:"#ef4444",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>remove</button>
                             </div>}
@@ -922,8 +934,29 @@ Rules:
                               <input type="number" value={lot.invested} onChange={e=>setEditLots(ls=>ls.map((l,i)=>i===li?{...l,invested:e.target.value}:l))} style={{...inp,padding:"4px 7px"}}/>
                             </div>
                             {!noTicker&&<div>
-                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{isCrypto?`${coinLabel} BOUGHT`:"SHARES"}</div>
-                              <input type="number" step="any" value={lot.units} onChange={e=>setEditLots(ls=>ls.map((l,i)=>i===li?{...l,units:e.target.value}:l))} placeholder={isCrypto?"e.g. 0.5":"e.g. 3.2"} style={{...inp,padding:"4px 7px"}}/>
+                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{isCrypto?`${coinLabel} BOUGHT`:"UNIDADES"}</div>
+                              <input type="number" step="any" value={lot.units} onChange={e=>{
+                                const newUnits=e.target.value;
+                                setEditLots(ls=>ls.map((l,i)=>{
+                                  if(i!==li)return l;
+                                  const updated={...l,units:newUnits};
+                                  // Auto-calc invested from units × avgPrice if avgPrice is set
+                                  if(l.avgPrice&&parseFloat(newUnits)>0) updated.invested=(parseFloat(newUnits)*parseFloat(l.avgPrice)).toFixed(2);
+                                  return updated;
+                                }));
+                              }} placeholder={isCrypto?"e.g. 0.5":"e.g. 14.8428"} style={{...inp,padding:"4px 7px"}}/>
+                            </div>}
+                            {!noTicker&&pos.platform==="eToro"&&<div>
+                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>AVG PRICE ($)</div>
+                              <input type="number" step="any" value={lot.avgPrice||""} onChange={e=>{
+                                const price=e.target.value;
+                                setEditLots(ls=>ls.map((l,i)=>{
+                                  if(i!==li)return l;
+                                  const updated={...l,avgPrice:price};
+                                  if(parseFloat(l.units)>0&&parseFloat(price)>0) updated.invested=(parseFloat(l.units)*parseFloat(price)).toFixed(2);
+                                  return updated;
+                                }));
+                              }} placeholder="e.g. 153.43" style={{...inp,padding:"4px 7px"}}/>
                             </div>}
                             <div>
                               <div style={{fontSize:10,color:C.mut,marginBottom:3}}>DATE</div>
@@ -936,7 +969,6 @@ Rules:
                         {noTicker&&<div style={{marginBottom:8}}>
                           <div style={{fontSize:10,color:C.mut,marginBottom:3}}>CURRENT VALUE (€)</div>
                           <input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} style={{...inp,padding:"4px 7px",width:120}}/>
-                          {pos.type==="fund"&&<span style={{fontSize:9,color:C.acc,marginLeft:8}}>BBVA → Valor total</span>}
                         </div>}
 
                         <div style={{display:"flex",gap:6,alignItems:"center"}}>
