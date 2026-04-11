@@ -409,8 +409,8 @@ export default function App() {
   const [priceData, setPriceData]         = useState({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [profile, setProfile]             = useState({ residence:"Spain", taxCountry:"Spain", employment:"Autónoma in Spain", extra:"" });
-  const [dbLoaded, setDbLoaded]           = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
+  const skipSavesRef = useRef(2);  // skip first 2 position saves: initial render + DB load
   const chatEndRef = useRef(null);
 
   useEffect(() => { api.me().then(()=>setAuthed(true)).catch(()=>setAuthed(false)); window.addEventListener("auth:logout",()=>setAuthed(false)); }, []);
@@ -429,12 +429,17 @@ export default function App() {
         });
         setPositions(fixed);
       }
-    }).catch(()=>{}).finally(()=>setDbLoaded(true));
+    }).catch(()=>{});
     api.storageGet("chat-history").then(r=>{const v=JSON.parse(r.value);if(Array.isArray(v)&&v.length>0)setChatMessages(v);}).catch(()=>{});
     api.storageGet("user-profile").then(r=>{const v=JSON.parse(r.value);if(v&&typeof v==="object")setProfile(v);}).catch(()=>{});
   }, [authed]);
 
-  useEffect(() => { if(!authed||!dbLoaded)return; api.storageSet("portfolio-positions",JSON.stringify(positions)).catch(()=>{}); }, [positions, authed, dbLoaded]);
+  useEffect(() => {
+    if (!authed) return;
+    // Skip the first 2 saves: (1) initial render with defaults, (2) DB load overwrite
+    if (skipSavesRef.current > 0) { skipSavesRef.current--; return; }
+    api.storageSet("portfolio-positions", JSON.stringify(positions)).catch(()=>{});
+  }, [positions, authed]);
   useEffect(() => { if(!authed)return; api.storageSet("chat-history",JSON.stringify(chatMessages)).catch(()=>{}); }, [chatMessages, authed]);
   useEffect(() => { if(!authed)return; api.storageSet("user-profile",JSON.stringify(profile)).catch(()=>{}); }, [profile, authed]);
 
