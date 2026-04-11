@@ -110,19 +110,26 @@ const PLATFORM_FEE_INFO = {
   "Revolut":    { rate:"1 free trade/mo (Std)", note:"€1 per trade after free allowance. Unlimited on paid plans." },
 };
 
-const SYSTEM_PROMPT = (ctx) =>
-  `You are a frank, knowledgeable personal investment advisor with full memory of all previous conversations.
+const SYSTEM_PROMPT = (ctx, strategy) =>
+  `You are a frank, knowledgeable personal investment advisor. You give consistent, long-term advice — not random ideas that change every conversation.
 
-Portfolio context (always up to date):
+${strategy ? `## AGREED LONG-TERM STRATEGY
+${strategy}
+
+This is the strategy the user has committed to. ALL advice must be consistent with this plan. Do not suggest changes to the strategy unless the user explicitly asks to revisit it. When allocating new money, follow this strategy. When evaluating positions, judge them against this strategy.` : `## NO STRATEGY SET YET
+The user hasn't set a long-term strategy. If they ask for advice, first help them define one: target allocation by type (stocks/ETFs/crypto/cash), risk level, time horizon, and rebalancing rules. Once agreed, tell them to save it in their profile.`}
+
+## CURRENT PORTFOLIO
 ${ctx}
 
-Rules:
-- You remember everything discussed previously — reference it naturally when relevant.
-- Be specific, direct, and actionable. Use the user's actual asset names.
+## RULES
+- Be specific, direct, and actionable. Use the user's actual asset names and numbers.
+- When given new money to allocate, show exactly where it should go based on the strategy — which positions to top up and by how much.
+- When evaluating the portfolio, compare current allocation vs strategy targets and flag drift.
 - Use markdown: ## sections, **bold**, - bullets, tables when comparing.
-- When given a proposed allocation, give a clear verdict, your reasoning, and your alternative if different.
-- Always add a brief caveat that you're not a licensed financial advisor.
-- Never repeat the full portfolio back unless asked.`;
+- Keep it concise. No fluff. No generic disclaimers beyond a one-line caveat.
+- Never repeat the full portfolio back unless asked.
+- Add a brief caveat that you're not a licensed financial advisor.`;
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function groupBy(positions, key) {
@@ -406,11 +413,12 @@ export default function App() {
   // Apply modal state
   const [applyChanges, setApplyChanges]   = useState(null);
   const [extracting, setExtracting]       = useState(false);
+  const [extractingStrategy, setExtractingStrategy] = useState(false);
   const [priceData, setPriceData]         = useState({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [etoroSyncing, setEtoroSyncing]   = useState(false);
   const [binanceSyncing, setBinanceSyncing] = useState(false);
-  const [profile, setProfile]             = useState({ residence:"Spain", taxCountry:"Spain", employment:"Autónoma in Spain", extra:"" });
+  const [profile, setProfile]             = useState({ residence:"Spain", taxCountry:"Spain", employment:"Autónoma in Spain", extra:"", strategy:"" });
   const [editingProfile, setEditingProfile] = useState(false);
   const skipSavesRef = useRef(2);  // skip first 2 position saves: initial render + DB load
   const chatEndRef = useRef(null);
@@ -625,7 +633,7 @@ export default function App() {
     const msgs = [...currentHistory, {role:"user", content:userMessage}];
     setChatMessages(msgs); setChatLoading(true);
     try {
-      const { content } = await api.ai(SYSTEM_PROMPT(portfolioContext), msgs);
+      const { content } = await api.ai(SYSTEM_PROMPT(portfolioContext, profile.strategy), msgs);
       setChatMessages([...msgs, {role:"assistant", content}]);
     } catch { setChatMessages([...msgs, {role:"assistant", content:"Something went wrong. Try again."}]); }
     setChatLoading(false);
@@ -693,6 +701,23 @@ Rules:
       alert("Couldn't extract changes. Make sure the advisor gave specific amounts.");
     }
     setExtracting(false);
+  }
+
+  async function extractStrategy() {
+    setExtractingStrategy(true);
+    const conversation = chatMessages.map(m => `${m.role === "user" ? "User" : "Advisor"}: ${m.content}`).join("\n\n");
+    try {
+      const { content } = await api.ai(
+        "You are a strategy distiller. Extract the agreed investment strategy from this conversation into a concise, actionable plan. Format: target allocation % by category, time horizon, DCA plan, rebalancing rules, risk tolerance. Use plain text, no markdown. Under 200 words. Only include what was actually agreed, not suggestions that were rejected.",
+        [{ role: "user", content: `Extract the strategy from this conversation:\n\n${conversation}` }]
+      );
+      if (content && content.trim()) {
+        setProfile(p => ({ ...p, strategy: content.trim() }));
+        flash();
+        alert("Strategy saved to your profile! All future AI advice will follow this plan.");
+      }
+    } catch { alert("Couldn't extract strategy. Try again."); }
+    setExtractingStrategy(false);
   }
 
   // ── Apply confirmed changes to portfolio ──────────────────────────────────
@@ -810,6 +835,11 @@ Rules:
                 </div>
                 {editingProfile
                   ? <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                      <div>
+                        <div style={{fontSize:10,color:C.acc,marginBottom:3,fontWeight:700}}>LONG-TERM STRATEGY</div>
+                        <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={profile.strategy||""} onChange={e=>setProfile(p=>({...p,strategy:e.target.value}))} placeholder={"e.g. 60% ETFs (S&P500 + Tech), 20% individual stocks, 15% crypto (BTC/ETH), 5% cash. DCA €500/month into ETFs. Rebalance quarterly. 10+ year horizon. Bold growth."}/>
+                        <div style={{fontSize:9,color:C.sub,marginTop:2}}>This anchors ALL AI advice. Be specific: target %, time horizon, risk level, DCA plan.</div>
+                      </div>
                       {[["residence","Residence"],["taxCountry","Taxes paid in"],["employment","Employment"],["extra","Additional context"]].map(([field,label])=>(
                         <div key={field}>
                           <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{label.toUpperCase()}</div>
@@ -818,6 +848,10 @@ Rules:
                       ))}
                     </div>
                   : <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                      {profile.strategy
+                        ? <div style={{fontSize:11,color:C.text,lineHeight:1.6,whiteSpace:"pre-wrap",marginBottom:4}}>{profile.strategy}</div>
+                        : <div style={{fontSize:11,color:"#f59e0b",fontStyle:"italic",marginBottom:4}}>No strategy set — AI advice will be inconsistent. Click edit to define one.</div>
+                      }
                       {[["Residence",profile.residence],["Taxes",profile.taxCountry],["Employment",profile.employment],profile.extra&&["Context",profile.extra]].filter(Boolean).map(([label,val])=>(
                         <div key={label} style={{display:"flex",gap:8,fontSize:12}}>
                           <span style={{color:C.sub,minWidth:80}}>{label}</span>
@@ -1117,10 +1151,18 @@ Rules:
             {chatMessages.length===0&&!chatLoading&&(
               <div style={{color:C.sub,fontSize:12,lineHeight:1.8}}>
                 <div style={{color:C.acc,fontWeight:700,marginBottom:12}}>Your personal investment advisor</div>
-                <div>✦ Go to <strong style={{color:C.text}}>Allocate</strong> → <strong style={{color:C.text}}>Get AI Advice</strong> to analyse a proposed investment</div>
-                <div style={{marginTop:6}}>✦ Or just ask anything below — your portfolio is always in context</div>
+                {!profile.strategy&&<>
+                  <div style={{background:"#1a150a",border:"1px solid #3d2e0a",borderRadius:8,padding:14,marginBottom:14}}>
+                    <div style={{color:"#f59e0b",fontWeight:700,fontSize:12,marginBottom:6}}>Start here — define your strategy</div>
+                    <div style={{color:"#94a3b8",fontSize:11,marginBottom:10}}>A clear strategy means consistent advice. Click below and the AI will walk you through it based on your actual portfolio.</div>
+                    <button onClick={()=>{setChatInput("");aiChat("Help me define a long-term investment strategy. Look at my current portfolio, ask me about my risk tolerance, time horizon, how much I can invest monthly, and my goals. Then propose a specific plan with target allocation percentages. Keep it conversational — one question at a time.",chatMessages);}} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#f59e0b",color:"#0b0f1a",fontWeight:700,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+                      Help me define my strategy →
+                    </button>
+                  </div>
+                </>}
+                <div>✦ {profile.strategy?"Ask anything — advice follows your strategy":"Or just ask anything below — your portfolio is always in context"}</div>
+                <div style={{marginTop:6}}>✦ After advice, tap <strong style={{color:C.text}}>Apply to Portfolio</strong> or <strong style={{color:"#f59e0b"}}>Save as Strategy</strong></div>
                 <div style={{marginTop:6}}>✦ Every message is saved across sessions</div>
-                <div style={{marginTop:6}}>✦ After advice, tap <strong style={{color:C.text}}>Apply to Portfolio</strong> to pre-fill changes</div>
               </div>
             )}
             {chatMessages.map((m,i)=>(
@@ -1129,15 +1171,18 @@ Rules:
                 <div style={{maxWidth:"92%",padding:"12px 14px",borderRadius:m.role==="user"?"12px 12px 2px 12px":"12px 12px 12px 2px",background:m.role==="user"?"#1e3a5f":"#131f30",color:m.role==="user"?"#bae6fd":"#cbd5e1",fontSize:13,lineHeight:1.65}}>
                   {m.role==="user"?<span style={{whiteSpace:"pre-wrap"}}>{m.content}</span>:<Markdown text={m.content}/>}
                 </div>
-                {/* Apply button appears after every advisor message */}
+                {/* Action buttons after last advisor message */}
                 {m.role==="assistant" && i===chatMessages.length-1 && !chatLoading && (
-                  <button
-                    onClick={extractChanges}
-                    disabled={extracting}
-                    style={{marginTop:8,padding:"7px 14px",borderRadius:8,border:`1px solid ${C.acc}44`,background:extracting?"#0d1117":"#0a1f2e",color:extracting?C.mut:C.acc,fontSize:11,fontWeight:600,cursor:extracting?"default":"pointer",fontFamily:"'DM Mono',monospace",alignSelf:"flex-start",transition:"all 0.15s"}}
-                  >
-                    {extracting?"⟳ Reading advice…":"⊕ Apply to Portfolio"}
-                  </button>
+                  <div style={{display:"flex",gap:8,marginTop:8,alignSelf:"flex-start",flexWrap:"wrap"}}>
+                    <button onClick={extractChanges} disabled={extracting}
+                      style={{padding:"7px 14px",borderRadius:8,border:`1px solid ${C.acc}44`,background:extracting?"#0d1117":"#0a1f2e",color:extracting?C.mut:C.acc,fontSize:11,fontWeight:600,cursor:extracting?"default":"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s"}}>
+                      {extracting?"⟳ Reading advice…":"⊕ Apply to Portfolio"}
+                    </button>
+                    <button onClick={extractStrategy} disabled={extractingStrategy}
+                      style={{padding:"7px 14px",borderRadius:8,border:`1px solid #f59e0b44`,background:extractingStrategy?"#0d1117":"#1a150a",color:extractingStrategy?C.mut:"#f59e0b",fontSize:11,fontWeight:600,cursor:extractingStrategy?"default":"pointer",fontFamily:"'DM Mono',monospace",transition:"all 0.15s"}}>
+                      {extractingStrategy?"⟳ Extracting…":"⊕ Save as Strategy"}
+                    </button>
+                  </div>
                 )}
               </div>
             ))}
