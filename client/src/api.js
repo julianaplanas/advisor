@@ -30,4 +30,6 @@ export const api = {
   ai:          (system, messages) => request("POST", "/api/ai", { system, messages }),
   prices:      (tickers)          => request("POST", "/api/prices", { tickers }),
   priceAtDate: (ticker, date)     => request("POST", "/api/price-at-date", { ticker, date }),
+  etoroSync:   ()                 => request("POST", "/api/etoro-sync"),
+  binanceSync: ()                 => request("POST", "/api/binance-sync"),
 };

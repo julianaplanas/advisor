@@ -8,6 +8,7 @@ import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import crypto from "crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -250,6 +251,191 @@ app.post("/api/prices", requireAuth, async (req, res) => {
   });
 
   res.json({ prices });
+});
+
+// ─── ETORO SYNC ──────────────────────────────────────────────────────────────
+const ETORO_API_KEY  = process.env.ETORO_PUBLIC_KEY;
+const ETORO_USER_KEY = process.env.ETORO_API_KEY;
+
+function etoroHeaders() {
+  return {
+    "x-request-id": crypto.randomUUID(),
+    "x-api-key": ETORO_API_KEY,
+    "x-user-key": ETORO_USER_KEY,
+    "Accept": "application/json",
+  };
+}
+
+// Ticker extraction from eToro image URIs (e.g. "market-avatars/aapl/35x35.png" → "AAPL")
+function extractTicker(inst) {
+  const img = inst.images?.find(i => i.uri);
+  if (!img) return null;
+  const match = img.uri.match(/market-avatars\/([^/]+)\//);
+  return match ? match[1].toUpperCase() : null;
+}
+
+// Map eToro exchangeID to our region
+const EXCHANGE_REGION = { 4:"US", 5:"US", 6:"EU", 7:"EM", 38:"EU" };
+// Known ticker overrides (eToro image slugs → Yahoo Finance tickers)
+const ETORO_TICKER_MAP = {
+  "AAPL":"AAPL", "MSFT":"MSFT", "NVDA":"NVDA", "NET":"NET", "DDOG":"DDOG",
+  "VRTX":"VRTX", "ABBV":"ABBV", "MELI":"MELI", "VRNS":"VRNS", "TS":"TS",
+  "YPF":"YPF", "BAYN.DE":"BAYN.DE",
+  // ETFs (image slug is numeric)
+  "3275":"SXR8.DE", "2944":"QDVE.DE", "IDEM":"IDEM.L", "10560":"VGWD.DE",
+  // Stocks with numeric image slugs — map by instrumentID
+  "5712":"NET", "6414":"DDOG", "8666":"VRNS", "8857":"TS", "9495":"YPF",
+};
+
+app.post("/api/etoro-sync", requireAuth, async (req, res) => {
+  if (!ETORO_API_KEY || !ETORO_USER_KEY) {
+    return res.status(400).json({ error: "eToro API keys not configured" });
+  }
+
+  try {
+    // 1. Fetch portfolio (PnL endpoint has all positions + mirrors)
+    const pnlResp = await fetch("https://public-api.etoro.com/api/v1/trading/info/real/pnl", { headers: etoroHeaders() });
+    if (!pnlResp.ok) {
+      const txt = await pnlResp.text();
+      return res.status(pnlResp.status).json({ error: "eToro API error", detail: txt });
+    }
+    const pnlData = await pnlResp.json();
+    const rawPositions = pnlData.clientPortfolio?.positions || [];
+    const mirrors = pnlData.clientPortfolio?.mirrors || [];
+
+    // 2. Fetch instrument display data for names + tickers
+    const instResp = await fetch("https://public-api.etoro.com/api/v1/market-data/instruments", { headers: etoroHeaders() });
+    const instData = instResp.ok ? await instResp.json() : {};
+    const instList = instData.instrumentDisplayDatas || [];
+    const instMap = {};
+    instList.forEach(i => { instMap[i.instrumentID] = i; });
+
+    // 3. Group raw positions by instrumentID → aggregate into single positions with lots
+    const grouped = {};
+    rawPositions.forEach(p => {
+      const id = p.instrumentID;
+      if (!grouped[id]) grouped[id] = [];
+      grouped[id].push(p);
+    });
+
+    const positions = Object.entries(grouped).map(([instId, lots]) => {
+      const inst = instMap[parseInt(instId)] || {};
+      const rawTicker = extractTicker(inst) || instId.toString();
+      const ticker = ETORO_TICKER_MAP[rawTicker] || ETORO_TICKER_MAP[instId] || rawTicker;
+      const isEtf = inst.instrumentTypeID === 6;
+      const type = isEtf ? "etf" : "stock";
+      const region = EXCHANGE_REGION[inst.exchangeID] || "US";
+      const name = inst.instrumentDisplayName || ticker;
+
+      const mappedLots = lots.map(l => ({
+        date: l.openDateTime ? l.openDateTime.split("T")[0] : null,
+        invested: l.amount || 0,
+        units: l.units || null,
+        pnl: l.unrealizedPnL?.pnL || 0,
+      }));
+
+      const totalUnits = mappedLots.reduce((s, l) => s + (l.units || 0), 0);
+      const totalInvested = mappedLots.reduce((s, l) => s + l.invested, 0);
+      const totalPnl = mappedLots.reduce((s, l) => s + l.pnl, 0);
+
+      return {
+        ticker, name, type, region, units: totalUnits, invested: totalInvested,
+        currentValue: totalInvested + totalPnl, pnl: totalPnl,
+        lots: mappedLots.map(l => ({ date: l.date, invested: l.invested, units: l.units })),
+      };
+    });
+
+    // 4. Mirrors (managed portfolios like Target2033-FT, Core-Moderate)
+    const mirrorPositions = mirrors.map((m, i) => {
+      const mPositions = m.positions || [];
+      const totalInvested = mPositions.reduce((s, p) => s + (p.amount || 0), 0);
+      const totalPnl = mPositions.reduce((s, p) => s + (p.unrealizedPnL?.pnL || 0), 0);
+      return {
+        ticker: null,
+        name: `Managed Portfolio ${i + 1}`,
+        type: "fund",
+        region: "Global",
+        units: null,
+        invested: totalInvested,
+        currentValue: totalInvested + totalPnl,
+        pnl: totalPnl,
+        lots: [{ date: null, invested: totalInvested, units: null }],
+      };
+    });
+
+    res.json({ positions: [...positions, ...mirrorPositions] });
+  } catch (err) {
+    console.error("eToro sync error:", err);
+    res.status(500).json({ error: "eToro sync failed" });
+  }
+});
+
+// ─── BINANCE SYNC ────────────────────────────────────────────────────────────
+const BINANCE_API_KEY    = process.env.BINANCE_PUBLIC_KEY;
+const BINANCE_SECRET_KEY = process.env.BINANCE_API_KEY;
+
+function binanceSign(queryString) {
+  return queryString + "&signature=" + crypto.createHmac("sha256", BINANCE_SECRET_KEY).update(queryString).digest("hex");
+}
+
+// Coins we care about (skip dust like ETHW, PIXEL, W, etc.)
+const BINANCE_RELEVANT = new Set(["BTC","ETH","SOL","BNB","MATIC","ADA","AVAX","LINK","XRP","DOT","USDT","USDC","DAI"]);
+
+app.post("/api/binance-sync", requireAuth, async (req, res) => {
+  if (!BINANCE_API_KEY || !BINANCE_SECRET_KEY) {
+    return res.status(400).json({ error: "Binance API keys not configured" });
+  }
+
+  try {
+    const ts = Date.now();
+    const headers = { "X-MBX-APIKEY": BINANCE_API_KEY };
+
+    // 1. Spot balances
+    const spotResp = await fetch("https://api.binance.com/api/v3/account?" + binanceSign("timestamp=" + ts), { headers });
+    const spotData = spotResp.ok ? await spotResp.json() : {};
+    const spotBalances = {};
+    (spotData.balances || []).forEach(b => {
+      const amount = parseFloat(b.free) + parseFloat(b.locked);
+      if (amount > 0) spotBalances[b.asset] = (spotBalances[b.asset] || 0) + amount;
+    });
+
+    // 2. Simple Earn (staked) balances
+    const earnResp = await fetch("https://api.binance.com/sapi/v1/simple-earn/flexible/position?" + binanceSign("timestamp=" + Date.now()), { headers });
+    const earnData = earnResp.ok ? await earnResp.json() : {};
+    const earnBalances = {};
+    (earnData.rows || []).forEach(r => {
+      const amount = parseFloat(r.totalAmount) || 0;
+      if (amount > 0) earnBalances[r.asset] = (earnBalances[r.asset] || 0) + amount;
+    });
+
+    // 3. Merge: LD* tokens in spot are the Earn wrapper, but we already got Earn separately
+    // So combine spot (excluding LD*) + earn
+    const merged = {};
+    Object.entries(spotBalances).forEach(([asset, amount]) => {
+      if (asset.startsWith("LD")) return; // skip LD wrappers, we have the real earn amounts
+      if (!BINANCE_RELEVANT.has(asset)) return;
+      merged[asset] = (merged[asset] || 0) + amount;
+    });
+    Object.entries(earnBalances).forEach(([asset, amount]) => {
+      if (!BINANCE_RELEVANT.has(asset)) return;
+      merged[asset] = (merged[asset] || 0) + amount;
+    });
+
+    const positions = Object.entries(merged).map(([asset, units]) => {
+      const isStable = ["USDT","USDC","DAI"].includes(asset);
+      return {
+        asset,
+        ticker: isStable ? null : asset,
+        units: isStable ? null : units,
+        amount: units,
+      };
+    });
+
+    res.json({ positions });
+  } catch (err) {
+    console.error("Binance sync error:", err);
+    res.status(500).json({ error: "Binance sync failed" });
+  }
 });
 
 // ─── HISTORICAL PRICE ─────────────────────────────────────────────────────────

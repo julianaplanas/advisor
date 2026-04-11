@@ -408,6 +408,8 @@ export default function App() {
   const [extracting, setExtracting]       = useState(false);
   const [priceData, setPriceData]         = useState({});
   const [pricesLoading, setPricesLoading] = useState(false);
+  const [etoroSyncing, setEtoroSyncing]   = useState(false);
+  const [binanceSyncing, setBinanceSyncing] = useState(false);
   const [profile, setProfile]             = useState({ residence:"Spain", taxCountry:"Spain", employment:"Autónoma in Spain", extra:"" });
   const [editingProfile, setEditingProfile] = useState(false);
   const skipSavesRef = useRef(2);  // skip first 2 position saves: initial render + DB load
@@ -541,6 +543,80 @@ export default function App() {
       }));
     } catch (e) { console.error("Price refresh failed:", e); }
     setPricesLoading(false);
+  }
+
+  async function syncEtoro() {
+    setEtoroSyncing(true);
+    try {
+      const { positions: etoroPos } = await api.etoroSync();
+      if (!etoroPos || !etoroPos.length) { alert("No positions returned from eToro"); setEtoroSyncing(false); return; }
+
+      setPositions(current => {
+        const nonEtoro = current.filter(p => p.platform !== "eToro");
+
+        const newEtoro = etoroPos.map(ep => {
+          const existing = current.find(p => p.platform === "eToro" && (
+            (p.ticker && ep.ticker && p.ticker.toUpperCase() === ep.ticker.toUpperCase()) ||
+            p.name.toLowerCase() === ep.name.toLowerCase()
+          ));
+          const id = existing?.id || ep.ticker?.toLowerCase().replace(/\./g,"_") || Date.now().toString() + Math.random().toString(36).slice(2);
+          const lookup = ASSET_LOOKUP[ep.ticker?.split(".")[0]?.toUpperCase()];
+          const annualFee = lookup?.annualFee || existing?.annualFee || 0;
+
+          return {
+            id,
+            platform: "eToro",
+            name: lookup?.name || ep.name,
+            ticker: ep.ticker || null,
+            type: ep.type,
+            region: ep.region || lookup?.region || "US",
+            annualFee,
+            units: ep.units || null,
+            invested: ep.invested,
+            value: ep.invested, // live prices will update this
+            lots: ep.lots || [{ date: null, invested: ep.invested, units: ep.units }],
+          };
+        });
+
+        return [...nonEtoro, ...newEtoro];
+      });
+      flash();
+    } catch (e) { console.error("eToro sync failed:", e); alert("eToro sync failed: " + e.message); }
+    setEtoroSyncing(false);
+  }
+
+  async function syncBinance() {
+    setBinanceSyncing(true);
+    try {
+      const { positions: binPos } = await api.binanceSync();
+      if (!binPos || !binPos.length) { alert("No positions returned from Binance"); setBinanceSyncing(false); return; }
+
+      setPositions(current => {
+        const nonBinance = current.filter(p => p.platform !== "Binance");
+
+        const newBinance = binPos.map(bp => {
+          const existing = current.find(p => p.platform === "Binance" && p.name?.toUpperCase() === bp.asset);
+          const isStable = !bp.ticker;
+          return {
+            id: existing?.id || bp.asset.toLowerCase(),
+            platform: "Binance",
+            name: bp.asset,
+            ticker: bp.ticker,
+            type: "crypto",
+            region: "Crypto",
+            annualFee: 0,
+            units: bp.units,
+            invested: existing?.invested || 0, // preserve existing cost basis — Binance API doesn't provide it
+            value: existing?.invested || 0,
+            lots: existing?.lots || [{ date: null, invested: existing?.invested || 0, units: bp.units }],
+          };
+        });
+
+        return [...nonBinance, ...newBinance];
+      });
+      flash();
+    } catch (e) { console.error("Binance sync failed:", e); alert("Binance sync failed: " + e.message); }
+    setBinanceSyncing(false);
   }
 
   const portfolioContext = buildContext(positions, profile);
@@ -770,6 +846,8 @@ Rules:
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <span style={{fontSize:12,color:savedFlash?"#34d399":C.mut,transition:"color 0.3s"}}>{savedFlash?"✓ Saved":"Tap a value to edit"}</span>
               <button onClick={refreshPrices} disabled={pricesLoading} style={{fontSize:11,color:pricesLoading?C.sub:C.acc,background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:pricesLoading?"default":"pointer",fontFamily:"inherit"}}>{pricesLoading?"⟳ fetching…":"⟳ live prices"}</button>
+              <button onClick={syncEtoro} disabled={etoroSyncing} style={{fontSize:11,color:etoroSyncing?C.sub:"#00C896",background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:etoroSyncing?"default":"pointer",fontFamily:"inherit"}}>{etoroSyncing?"⟳ syncing…":"⟳ eToro"}</button>
+              <button onClick={syncBinance} disabled={binanceSyncing} style={{fontSize:11,color:binanceSyncing?C.sub:"#F0B90B",background:"none",border:`1px solid ${C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:binanceSyncing?"default":"pointer",fontFamily:"inherit"}}>{binanceSyncing?"⟳ syncing…":"⟳ Binance"}</button>
             </div>
             <button onClick={()=>setShowAddForm(f=>!f)} style={{fontSize:11,fontWeight:700,color:C.acc,background:"none",border:`1px solid ${C.acc}22`,borderRadius:6,padding:"5px 12px",cursor:"pointer",fontFamily:"inherit"}}>{showAddForm?"cancel":"+ add position"}</button>
           </div>
