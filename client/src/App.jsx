@@ -395,6 +395,7 @@ export default function App() {
   const [editVal, setEditVal]             = useState("");
   const [editingInvestedId, setEditingInvestedId] = useState(null);
   const [editInvestedVal, setEditInvestedVal]     = useState("");
+  const [editLots, setEditLots]           = useState([]);
   const [newPos, setNewPos]               = useState({platform:"eToro",name:"",invested:"",annualFee:"",ticker:"",type:"stock",region:"US",purchaseDate:"",units:null});
   const [showAddForm, setShowAddForm]     = useState(false);
   const [showAdvancedAdd, setShowAdvancedAdd] = useState(false);
@@ -870,67 +871,107 @@ Rules:
                   : noTicker ? pos.value : invested;
                 const pnl = currentValue - invested;
                 const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                const isCrypto = pos.type==="crypto";
+                const coinLabel = pos.name.trim().toUpperCase().split(" ")[0];
+                const isEditing = editingId===pos.id;
+                const fmtUnits = pos.units>0 ? (pos.units<0.01?pos.units.toFixed(6):pos.units<1?pos.units.toFixed(4):pos.units<100?parseFloat(pos.units.toFixed(4)):Math.round(pos.units)) : null;
+
                 return <div key={pos.id} style={{padding:"10px 0",borderBottom:`1px solid ${C.bdr}`}}>
                   <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:12,color:C.text,fontWeight:600}}>{pos.name}
-                        {pos.units>0&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>
-                          {pos.units<0.01?pos.units.toFixed(6):pos.units<1?pos.units.toFixed(4):pos.units<100?parseFloat(pos.units.toFixed(4)):Math.round(pos.units)} {pos.name.trim().toUpperCase().split(" ")[0]}
-                        </span>}
-                        {pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>{pos.lots.length} purchases{hasPartialLots&&<span style={{color:"#f59e0b"}}> · partial tracking</span>}</span>}
-                        {(!pos.units||pos.units<=0)&&pos.lots?.length===1&&pos.lots[0].date&&<span style={{fontSize:10,color:C.sub,fontWeight:400,marginLeft:6}}>since {pos.lots[0].date}</span>}
+                      {/* Name row — click to expand edit */}
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <button onClick={()=>{
+                          if(isEditing){setEditingId(null);}
+                          else{
+                            const lots = pos.lots && pos.lots.length>0
+                              ? pos.lots.map(l=>({invested:l.invested?.toString()||"",units:l.units?.toString()||"",date:l.date||""}))
+                              : [{invested:invested.toString(),units:pos.units?.toString()||"",date:""}];
+                            setEditLots(lots);
+                            setEditVal(pos.value.toString());
+                            setEditingId(pos.id);
+                            setEditingInvestedId(null);
+                          }
+                        }} style={{fontSize:12,color:C.text,fontWeight:600,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0}}>
+                          {pos.name}
+                          <span style={{fontSize:10,color:C.acc,marginLeft:5}}>{isEditing?"▾":"✎"}</span>
+                        </button>
+                        {!isEditing&&fmtUnits&&<span style={{fontSize:10,color:C.sub}}>{fmtUnits} {coinLabel}</span>}
+                        {!isEditing&&pos.lots?.length>1&&<span style={{fontSize:10,color:C.sub}}>{pos.lots.length} purchases{hasPartialLots&&<span style={{color:"#f59e0b"}}> · partial</span>}</span>}
                       </div>
                       <div style={{fontSize:10,color:C.sub,marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                         <span style={{color:TYPE_COLORS[pos.type]||C.sub}}>{pos.type}</span>
                         <span>· {pos.region}</span>
                         {pos.annualFee>0&&<span style={{color:"#f59e0b",background:"#1a150a",border:"1px solid #3d2e0a",borderRadius:3,padding:"0 4px"}}>{pos.annualFee}% p.a.</span>}
-                        {lp&&<span style={{color:lp.change24h>=0?"#34d399":"#f87171",background:lp.change24h>=0?"#0a1f14":"#1f0a0a",border:`1px solid ${lp.change24h>=0?"#134e2a":"#4e1313"}`,borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>€{lp.priceEur<10?lp.priceEur.toFixed(4):lp.priceEur<100?lp.priceEur.toFixed(2):Math.round(lp.priceEur).toLocaleString()}/unit {lp.change24h>=0?"+":""}{lp.change24h.toFixed(1)}%</span>}
-                        {noTicker&&pos.type==="fund"&&<span style={{color:C.sub,fontSize:10,fontStyle:"italic"}}>BBVA → Valor total de la inversión</span>}
+                        {lp&&<span style={{color:lp.change24h>=0?"#34d399":"#f87171",background:lp.change24h>=0?"#0a1f14":"#1f0a0a",border:`1px solid ${lp.change24h>=0?"#134e2a":"#4e1313"}`,borderRadius:3,padding:"0 4px",whiteSpace:"nowrap"}}>€{lp.priceEur<10?lp.priceEur.toFixed(4):lp.priceEur<100?lp.priceEur.toFixed(2):Math.round(lp.priceEur).toLocaleString()}/{isCrypto?"coin":"unit"} {lp.change24h>=0?"+":""}{lp.change24h.toFixed(1)}%</span>}
+                        {noTicker&&pos.type==="fund"&&<span style={{color:C.sub,fontSize:10,fontStyle:"italic"}}>BBVA → Valor total</span>}
                         {noTicker&&pos.type==="cash"&&<span style={{color:C.sub,fontSize:10,fontStyle:"italic"}}>manual</span>}
                       </div>
-                    </div>
 
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-                      <div style={{textAlign:"right"}}>
+                      {/* ── Expanded edit panel ── */}
+                      {isEditing&&<div style={{marginTop:8,padding:10,background:"#0d1826",border:`1px solid #1e3a5f`,borderRadius:8}}>
+                        {/* Per-lot editing */}
+                        {editLots.map((lot,li)=>(
+                          <div key={li} style={{display:"grid",gridTemplateColumns:noTicker?"1fr 1fr":"1fr 1fr 1fr",gap:8,marginBottom:editLots.length>1?6:8,paddingBottom:editLots.length>1&&li<editLots.length-1?6:0,borderBottom:editLots.length>1&&li<editLots.length-1?`1px solid ${C.bdr}`:"none"}}>
+                            {editLots.length>1&&<div style={{gridColumn:noTicker?"span 2":"span 3",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <span style={{fontSize:10,color:C.acc,fontWeight:700}}>Purchase {li+1}</span>
+                              <button onClick={()=>setEditLots(ls=>ls.filter((_,i)=>i!==li))} style={{fontSize:11,color:"#ef4444",background:"none",border:"none",cursor:"pointer",fontFamily:"inherit"}}>remove</button>
+                            </div>}
+                            <div>
+                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{pos.type==="fund"?"APORTACIONES (€)":"INVESTED (€)"}</div>
+                              <input type="number" value={lot.invested} onChange={e=>setEditLots(ls=>ls.map((l,i)=>i===li?{...l,invested:e.target.value}:l))} style={{...inp,padding:"4px 7px"}}/>
+                            </div>
+                            {!noTicker&&<div>
+                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>{isCrypto?`${coinLabel} BOUGHT`:"SHARES"}</div>
+                              <input type="number" step="any" value={lot.units} onChange={e=>setEditLots(ls=>ls.map((l,i)=>i===li?{...l,units:e.target.value}:l))} placeholder={isCrypto?"e.g. 0.5":"e.g. 3.2"} style={{...inp,padding:"4px 7px"}}/>
+                            </div>}
+                            <div>
+                              <div style={{fontSize:10,color:C.mut,marginBottom:3}}>DATE</div>
+                              <input type="date" value={lot.date} onChange={e=>setEditLots(ls=>ls.map((l,i)=>i===li?{...l,date:e.target.value}:l))} style={{...inp,padding:"4px 7px"}}/>
+                            </div>
+                          </div>
+                        ))}
 
-                        {/* ── AUTO: live price × units (read-only) ── */}
-                        {isAuto&&<div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:3}}>
-                          €{currentValue.toLocaleString()}<span style={{fontSize:9,color:"#34d399",marginLeft:4}}>live</span>
+                        {/* Fund/cash: current value field */}
+                        {noTicker&&<div style={{marginBottom:8}}>
+                          <div style={{fontSize:10,color:C.mut,marginBottom:3}}>CURRENT VALUE (€)</div>
+                          <input type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} style={{...inp,padding:"4px 7px",width:120}}/>
+                          {pos.type==="fund"&&<span style={{fontSize:9,color:C.acc,marginLeft:8}}>BBVA → Valor total</span>}
                         </div>}
 
-                        {/* ── NO TICKER (fund/cash): manual current value ── */}
-                        {noTicker&&!isAuto&&(editingId===pos.id
-                          ? <div style={{marginBottom:3}}>
-                              {pos.type==="fund"&&<div style={{fontSize:9,color:"#22d3ee",marginBottom:4}}>BBVA app → "{pos.name}" → Valor total de la inversión</div>}
-                              <div style={{display:"flex",gap:5,alignItems:"center"}}>
-                                <span style={{fontSize:11,color:C.mut}}>€</span>
-                                <input autoFocus type="number" value={editVal} onChange={e=>setEditVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveValue(pos.id);if(e.key==="Escape")setEditingId(null);}} style={{...inp,width:90,padding:"3px 7px"}}/>
-                                <button onClick={()=>saveValue(pos.id)} style={{padding:"3px 8px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                                <button onClick={()=>setEditingId(null)} style={{padding:"3px 6px",background:"none",border:`1px solid ${C.bdr}`,borderRadius:4,color:C.mut,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>✕</button>
-                              </div>
-                            </div>
-                          : <button onClick={()=>{setEditingId(pos.id);setEditVal(pos.value.toString());setEditingInvestedId(null);}} style={{fontSize:14,color:C.text,fontWeight:700,background:"none",border:`1px solid ${pos.type==="fund"?"#1e3a5f":C.bdr}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",fontFamily:"inherit",display:"block",marginBottom:3}}>
-                              €{currentValue.toLocaleString()}{pos.type==="fund"&&<span style={{fontSize:10,color:C.mut,fontWeight:400,marginLeft:5}}>✎</span>}
-                            </button>
-                        )}
+                        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <button onClick={()=>{
+                            const lots = editLots.map(l=>({date:l.date||null,invested:parseFloat(l.invested)||0,units:parseFloat(l.units)||null}));
+                            const totalInvested = lots.reduce((s,l)=>s+l.invested,0);
+                            const knownUnits = lots.filter(l=>l.units!=null&&l.units>0);
+                            const totalUnits = knownUnits.length>0?knownUnits.reduce((s,l)=>s+l.units,0):null;
+                            const v = parseFloat(editVal);
+                            setPositions(ps=>ps.map(p=>{
+                              if(p.id!==pos.id) return p;
+                              return {...p, lots, invested:totalInvested, units:totalUnits, value:noTicker&&!isNaN(v)&&v>=0?v:totalInvested};
+                            }));
+                            setEditingId(null);flash();
+                          }} style={{padding:"5px 14px",background:C.acc,border:"none",borderRadius:5,color:"#0b0f1a",fontWeight:700,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Save</button>
+                          <button onClick={()=>setEditingId(null)} style={{padding:"5px 12px",background:"none",border:`1px solid ${C.bdr}`,borderRadius:5,color:C.mut,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+                        </div>
+                      </div>}
+                    </div>
 
-                        {/* ── PAID — editable for all positions ── */}
-                        <div style={{fontSize:10,display:"flex",gap:5,justifyContent:"flex-end",alignItems:"center"}}>
-                          {editingInvestedId===pos.id
-                            ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                                <span style={{color:C.sub}}>{pos.type==="fund"?"aportaciones €":"paid €"}</span>
-                                <input autoFocus type="number" value={editInvestedVal} onChange={e=>setEditInvestedVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveInvested(pos.id);if(e.key==="Escape")setEditingInvestedId(null);}} style={{...inp,width:70,padding:"2px 6px",fontSize:11}}/>
-                                <button onClick={()=>saveInvested(pos.id)} style={{padding:"2px 6px",background:C.acc,border:"none",borderRadius:4,color:"#0b0f1a",fontWeight:700,fontSize:10,cursor:"pointer",fontFamily:"inherit"}}>✓</button>
-                              </div>
-                            : <button onClick={()=>{setEditingInvestedId(pos.id);setEditInvestedVal(invested.toString());setEditingId(null);}} style={{fontSize:isAuto||noTicker?10:14,color:isAuto||noTicker?C.sub:C.text,fontWeight:isAuto||noTicker?400:700,background:"none",border:isAuto||noTicker?"none":`1px solid ${C.bdr}`,borderRadius:6,padding:isAuto||noTicker?0:"3px 9px",cursor:"pointer",fontFamily:"inherit",textDecoration:isAuto||noTicker?"underline dotted":"none",textUnderlineOffset:2}}>
-                                {pos.type==="fund"?"aportaciones ":isAuto||noTicker?"paid ":""}€{Math.round(invested).toLocaleString()}
-                              </button>
-                          }
+                    {/* Right side — value display */}
+                    {!isEditing&&<div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                      <div style={{textAlign:"right"}}>
+                        {isAuto
+                          ? <div style={{fontSize:14,fontWeight:700,color:C.text}}>€{currentValue.toLocaleString()}<span style={{fontSize:9,color:"#34d399",marginLeft:4}}>live</span></div>
+                          : <div style={{fontSize:14,fontWeight:700,color:C.text}}>€{currentValue.toLocaleString()}</div>
+                        }
+                        <div style={{fontSize:10,marginTop:2,display:"flex",gap:5,justifyContent:"flex-end",alignItems:"center"}}>
+                          <span style={{color:C.sub}}>{pos.type==="fund"?"aportaciones":"paid"} €{Math.round(invested).toLocaleString()}</span>
                           {pnl!==0&&<span style={{color:pnl>=0?"#34d399":"#f87171"}}>{pnl>=0?"+":""}{Math.round(pnl)}€ ({pnlPct.toFixed(1)}%)</span>}
                         </div>
                       </div>
                       <button onClick={()=>deletePosition(pos.id)} style={{fontSize:14,color:"#475569",background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1}}>×</button>
-                    </div>
+                    </div>}
+                    {isEditing&&<button onClick={()=>deletePosition(pos.id)} style={{fontSize:14,color:"#475569",background:"none",border:"none",cursor:"pointer",padding:"2px 4px",lineHeight:1,alignSelf:"flex-start"}}>×</button>}
                   </div>
                 </div>;
               })}
